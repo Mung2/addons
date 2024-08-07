@@ -1,8 +1,8 @@
 {
   "name": "Wallpad Controller with RS485",
-  "version": "0.8.7",
+  "version": "1.2.0",
   "slug": "wallpad",
-  "description": "코맥스/삼성/대림 월패드가 가능한 nodejs 서버 애드온입니다.",
+  "description": "코맥스/삼성/대림/현대/나비엔 월패드가 가능한 nodejs 서버 애드온입니다.",
   "arch": [
     "armhf",
     "armv7",
@@ -18,15 +18,15 @@
   "boot": "auto",
   "uart": true,
   "options": {
-    "model":"commax",
+    "model": "commax",
     "type": "serial",
     "sendDelay": 150,
-    "serial":{
+    "serial": {
       "port": "/dev/ttyUSB0",
       "baudrate": 9600,
-      "parity" : "none"
+      "parity": "none"
     },
-    "socket" : {
+    "socket": {
       "deviceIP": "192.0.0.1",
       "port": 8899
     },
@@ -38,18 +38,18 @@
     }
   },
   "schema": {
-    "model":"list(commax|samsung|daelim|hyundai)",
+    "model": "list(commax|samsung|daelim|hyundai|navien)",
     "type": "list(serial|socket)",
     "sendDelay": "int",
-    "serial":{
+    "serial": {
       "port": "str?",
       "baudrate": "int?",
-      "parity" : "list(none|even|odd)?"
+      "parity": "list(none|even|odd)?"
     },
-    "socket" : {
+    "socket": {
       "deviceIP": "str?",
       "port": "int?"
-    },    
+    },
     "mqtt": {
       "server": "str",
       "username": "str",
