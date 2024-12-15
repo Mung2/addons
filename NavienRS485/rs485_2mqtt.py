@@ -5,11 +5,11 @@ from functools import reduce
 from collections import defaultdict
 import json
 
-MQTT_USERNAME = ''
-MQTT_PASSWORD = ''
-MQTT_SERVER = ''
-MQTT_PORT = 
-ROOT_TOPIC_NAME = 'rs485_mqtt'
+MQTT_USERNAME = 'admin'
+MQTT_PASSWORD = 'GoTjd8864!'
+MQTT_SERVER = '192.168.219.201'
+MQTT_PORT = 1883
+ROOT_TOPIC_NAME = 'ew11/send'
 HOMEASSISTANT_ROOT_TOPIC_NAME = 'homeassistant'
 
 class Device:
