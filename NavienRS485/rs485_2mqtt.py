@@ -302,53 +302,89 @@ optional_info = {'optimistic': 'false'}
 주방.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'0[01](0[01])(0[01])', process_func=lambda v: 'ON' if v == '01' else 'OFF')
 주방.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['51','52'], process_func=lambda v: '01' if v == 'ON' else '00')
 
-## 난방 설정
-optional_info = {'modes': ['off', 'heat'], 'temp_step': 0.5, 'precision': 0.5, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
-
-# 난방 디바이스 추가
-난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices=["거실", "안방", "끝방", "중간방"], device_class='climate', optional_info=optional_info)
-
-# 방별 제어 ID 설정
-controll_ids = {
-    "거실": '11', 
-    "안방": '12', 
-    "끝방": '13', 
-    "중간방": '14'
+optional_info = {
+    'modes': ['off', 'heat'], 
+    'temp_step': 1.0, 
+    'precision': 1.0, 
+    'min_temp': 10.0, 
+    'max_temp': 40.0, 
+    'send_if_off': 'false'
 }
 
-# 메시지 플래그에 따른 상태 및 커맨드 처리
-for message_flag in ['81', '01']:  # 81과 01 메시지 플래그에 대해서 모두 처리
-    for room, room_id in controll_ids.items():
-        # 방별 난방 상태 등록
-        난방.register_status(message_flag, attr_name=f'{room}_power', topic_class=f'{room}_mode_state_topic', regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}', process_func=lambda v: 'heat' if v != '00' else 'off')
+# 난방 장치 등록
+난방 = wallpad.add_device(
+    device_name='난방', 
+    device_id='36', 
+    device_subid='1f', 
+    child_devices=["거실", "안방", "끝방", "중간방"], 
+    device_class='climate', 
+    optional_info=optional_info
+)
 
-        # 방별 외출 상태 등록
-        난방.register_status(message_flag=message_flag, attr_name=f'{room}_away_mode', topic_class=f'{room}_away_mode_state_topic', regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})([0-9a-fA-F]{2})[0-9a-fA-F]{16}', process_func=lambda v: 'ON' if v != '00' else 'OFF')
+# 패킷에 대한 상태 등록
+for message_flag in ['81', '01']:
+    # power 상태: 난방이 켜져 있는지 꺼져 있는지
+    난방.register_status(
+        message_flag, 
+        attr_name='power', 
+        topic_class='mode_state_topic', 
+        regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}', 
+        process_func=lambda v: 'heat' if int(v, 16) != 0 else 'off'
+    )
 
-        # 방별 현재 온도 상태 등록
-        난방.register_status(message_flag=message_flag, attr_name=f'{room}_currenttemp', topic_class=f'{room}_current_temperature_topic', regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})', process_func=lambda v: process_temperature(v))
+    # away_mode 상태: 외출 모드 ON/OFF
+    난방.register_status(
+        message_flag=message_flag, 
+        attr_name='away_mode', 
+        topic_class='away_mode_state_topic', 
+        regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})([0-9a-fA-F]{2})[0-9a-fA-F]{16}', 
+        process_func=lambda v: 'ON' if int(v, 16) != 0 else 'OFF'
+    )
 
-        # 방별 목표 온도 상태 등록
-        난방.register_status(message_flag=message_flag, attr_name=f'{room}_targettemp', topic_class=f'{room}_temperature_state_topic', regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})', process_func=lambda v: process_temperature(v))
+    # 현재 온도 상태: 각 방의 현재 온도를 추출
+    난방.register_status(
+        message_flag=message_flag, 
+        attr_name='currenttemp', 
+        topic_class='current_temperature_topic', 
+        regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})', 
+        process_func=lambda v: int(v, 16)
+    )
+
+    # 목표 온도 상태: 각 방의 목표 온도를 추출
+    난방.register_status(
+        message_flag=message_flag, 
+        attr_name='targettemp', 
+        topic_class='temperature_state_topic', 
+        regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})', 
+        process_func=lambda v: int(v, 16)
+    )
 
     # 난방 온도 설정 커맨드
-    for room, room_id in controll_ids.items():
-        # 방별 난방 모드 커맨드
-        난방.register_command(message_flag='43', attr_name=f'{room}_power', topic_class=f'{room}_mode_command_topic', controll_id=[room_id], process_func=lambda v: '01' if v == 'heat' else '00')
-        
-        # 방별 목표 온도 설정 커맨드 (0.5단위 변환 적용)
-        난방.register_command(message_flag='44', attr_name=f'{room}_targettemp', topic_class=f'{room}_temperature_command_topic', controll_id=[room_id], process_func=lambda v: hex(int(float(v * 2)))[2:])
-        
-        # 방별 외출 모드 설정 커맨드
-        난방.register_command(message_flag='45', attr_name=f'{room}_away_mode', topic_class=f'{room}_away_mode_command_topic', controll_id=[room_id], process_func=lambda v: '01' if v == 'ON' else '00')
+    난방.register_command(
+        message_flag='43', 
+        attr_name='power', 
+        topic_class='mode_command_topic', 
+        controll_id=['11','12','13','14'], 
+        process_func=lambda v: '01' if v == 'heat' else '00'
+    )
 
-# 방별 온도 처리 함수 (0.5 단위 적용)
-def process_temperature(v):
-    # 온도를 0.5단위로 변환
-    if len(v) == 4:
-        return float(int(v[0:2], 16) + int(v[2:4], 16) / 100)
-    else:
-        return int(v, 16)
+    # 목표 온도 설정 커맨드
+    난방.register_command(
+        message_flag='44', 
+        attr_name='targettemp', 
+        topic_class='temperature_command_topic', 
+        controll_id=['11','12','13','14'], 
+        process_func=lambda v: hex(int(float(v)))[2:]
+    )
+
+    # 외출 모드 커맨드
+    난방.register_command(
+        message_flag='45', 
+        attr_name='away_mode', 
+        topic_class='away_mode_command_topic', 
+        controll_id=['11','12','13','14'], 
+        process_func=lambda v: '01' if v == 'ON' else '00'
+    )
 
 # 엘리베이터
 optional_info = {'modes': ['down']}
