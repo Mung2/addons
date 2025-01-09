@@ -319,7 +319,7 @@ for message_flag in ['81', '01', ]:
     
     # 난방온도 설정 커맨드
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v == 'heat' else '00')
-    난방.register_command(message_flag='44', attr_name='targettemp', topic_class='temperature_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: hex(int(float(v)))[2:])
+    난방.register_command(message_flag='44', attr_name='targettemp', topic_class='temperature_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x'))
     난방.register_command(message_flag='45', attr_name='away_mode', topic_class='away_mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v =='ON' else '00')
 
 # 엘리베이터
