@@ -287,7 +287,7 @@ optional_info = {'optimistic': 'false'}
 중간방 = wallpad.add_device(device_name='중간방', device_id='0e', device_subid='4f', child_devices = ["중간방", "펜트리"], device_class='light', optional_info=optional_info)
 주방 = wallpad.add_device(device_name='주방', device_id='0e', device_subid='5f', child_devices = ["주방", "식탁"], device_class='light', optional_info=optional_info)
 
-거실.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'00(1[345][12]|02)(0[01])', process_func=lambda v: 'ON' if v in ['13', '23', '33', '43', '53'] else 'OFF' if v == '02' else 'ON' if v == '01' else 'OFF')
+거실.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'00([012345][23])(0[01])', process_func=lambda v: 'ON' if v in ['13', '23', '33', '43', '53'] else 'OFF' if v == '02' else 'ON' if v == '01' else 'OFF')
 거실.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['11','12'], process_func=lambda v: '01' if v == 'ON' else '00')
 
 안방.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'0[01](0[01])', process_func=lambda v: 'ON' if v == '01' else 'OFF')
@@ -303,8 +303,8 @@ optional_info = {'optimistic': 'false'}
 주방.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['51','52'], process_func=lambda v: '01' if v == 'ON' else '00')
 
 # 난방
-optional_info = {'modes': ['off', 'heat',], 'temp_step': 1.0, 'precision': 1.0, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
-난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices = ["거실", "침실", "서재"], device_class='climate', optional_info=optional_info)
+optional_info = {'modes': ['off', 'heat',], 'temp_step': 0.5, 'precision': 0.5, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
+난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices = ["거실", "안방", "끝방", "중간방"], device_class='climate', optional_info=optional_info)
 
 for message_flag in ['81', '01', ]:
     # 0007000000141619191619
