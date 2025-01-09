@@ -303,7 +303,7 @@ optional_info = {'optimistic': 'false'}
 주방.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['51','52'], process_func=lambda v: '01' if v == 'ON' else '00')
 
 # 난방
-optional_info = {'modes': ['off', 'heat',], 'temp_step': 1.0, 'precision': 1.0, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
+optional_info = {'modes': ['off', 'heat',], 'temp_step': 0.5, 'precision': 0.5, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
 난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices = ["거실", "안방", "끝방","중간방"], device_class='climate', optional_info=optional_info)
 
 for message_flag in ['81', '01', ]:
