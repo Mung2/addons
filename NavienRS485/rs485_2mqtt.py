@@ -171,18 +171,10 @@ optional_info = {'optimistic': 'false', 'speed_range_min': 1, 'speed_range_max':
 전열교환기.register_command(message_flag = '42', attr_name = 'percentage',  topic_class = 'percentage_command_topic', process_func = lambda v: {payload: packet for packet, payload in packet_2_payload_percentage.items()}[v])
 전열교환기.register_command(message_flag = '43', attr_name = 'heat',        topic_class = 'oscillation_command_topic', process_func = lambda v: {payload: packet for packet, payload in packet_2_payload_oscillation.items()}[v])
 
-### 가스차단기 ###
-optional_info = {'optimistic': 'false'}
-가스 = wallpad.add_device(device_name = '가스', device_id = '12', device_subid = '01', device_class = 'switch', optional_info = optional_info)
-가스.register_status(message_flag = '01', attr_name = 'availability', topic_class ='availability_topic', regex = r'()', process_func = lambda v: 'online')
-가스.register_status(message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[12])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-가스.register_status(message_flag = 'c1', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[12])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-
-가스.register_command(message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v == 'ON' else '00')
-
 ### 조명 ###
 optional_info = {'optimistic': 'false'}
-거실    = wallpad.add_device(device_name = '거실', device_id = '0e', device_subid = '11', device_class = 'light', optional_info = optional_info)
+
+# 일반 조명 추가 (디밍과 색온도가 없는 조명)
 복도    = wallpad.add_device(device_name = '복도', device_id = '0e', device_subid = '12', device_class = 'light', optional_info = optional_info)
 안방     = wallpad.add_device(device_name = '안방',  device_id = '0e', device_subid = '21', device_class = 'light', optional_info = optional_info)
 끝방     = wallpad.add_device(device_name = '끝방',  device_id = '0e', device_subid = '31', device_class = 'light', optional_info = optional_info)
@@ -191,32 +183,43 @@ optional_info = {'optimistic': 'false'}
 주방     = wallpad.add_device(device_name = '주방',  device_id = '0e', device_subid = '51', device_class = 'light', optional_info = optional_info)
 식탁     = wallpad.add_device(device_name = '식탁',  device_id = '0e', device_subid = '52', device_class = 'light', optional_info = optional_info)
 
-거실.register_status(message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])0[01]0[01]', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-복도.register_status(message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'000[01](0[01])0[01]', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-안방.register_status( message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'000[01]0[01](0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-끝방.register_status( message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-중간방.register_status( message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'000[01]0[01](0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-중간방펜트리.register_status( message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'000[01]0[01](0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-주방.register_status( message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'000[01]0[01](0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-식탁.register_status( message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'000[01]0[01](0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
+# 상태 등록 (디밍과 색온도가 없는 일반 조명)
+def register_basic_status(device):
+    device.register_status(message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])0[01]0[01]', process_func = lambda v: 'ON' if v == '01' else 'OFF')
 
-거실.register_status(message_flag = 'c1', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-복도.register_status(message_flag = 'c1', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-안방.register_status( message_flag = 'c1', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-끝방.register_status( message_flag = 'c1', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-중간방.register_status( message_flag = 'c1', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-중간방펜트리.register_status( message_flag = 'c1', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-주방.register_status( message_flag = 'c1', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-식탁.register_status( message_flag = 'c1', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
+# 일반 조명 상태 등록
+register_basic_status(복도)
+register_basic_status(안방)
+register_basic_status(끝방)
+register_basic_status(중간방)
+register_basic_status(중간방펜트리)
+register_basic_status(주방)
+register_basic_status(식탁)
 
-거실.register_command(message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00') # 'ON': '01' / 'OFF': '00'
-복도.register_command(message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')
-안방.register_command( message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')
-끝방.register_command( message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')
-중간방.register_command( message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')
-중간방펜트리.register_command( message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')
-주방.register_command( message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')
-식탁.register_command( message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')
+# 디밍 조명 상태 등록 (거실등 예시)
+def register_dim_status(device):
+    device.register_status(message_flag = '81', attr_name = 'power', topic_class ='state_topic', regex = r'00(0[01])', process_func = lambda v: 'ON' if v == '01' else 'OFF')
+    device.register_status(message_flag = '81', attr_name = 'brightness', topic_class = 'state_topic', regex = r'([0-9A-F]{2})', process_func = lambda v: int(v, 16) * 20)  # 0x0~0xF을 0~100 밝기 비율로 변환
+
+# 디밍이 가능한 거실 조명 등록
+거실 = wallpad.add_device(device_name = '거실', device_id = '0e', device_subid = '11', device_class = 'light', optional_info = optional_info)
+register_dim_status(거실)
+
+# 색온도 조정 상태 등록 (거실등 예시)
+def register_color_temp_status(device):
+    device.register_status(message_flag = '81', attr_name = 'color_temperature', topic_class = 'state_topic', regex = r'([0-9A-F]{2})', process_func = lambda v: int(v, 16) * 5)  # 0x01~0x05를 1~5 단계로 변환
+
+# 색온도 조정 가능한 거실 조명 등록
+register_color_temp_status(거실)
+
+# 명령 등록 (디밍과 색온도가 포함된 명령)
+def register_command(device):
+    device.register_command(message_flag = '41', attr_name = 'power', topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')  # 'ON': '01' / 'OFF': '00'
+    device.register_command(message_flag = '41', attr_name = 'brightness', topic_class = 'command_topic', process_func = lambda v: hex(int(v) // 20)[2:].zfill(2))  # 0~100을 0x0~0xF로 변환
+    device.register_command(message_flag = '41', attr_name = 'color_temperature', topic_class = 'command_topic', process_func = lambda v: hex(int(v))[2:].zfill(2))  # 1~5 단계를 0x01~0x05로 변환
+
+# 명령을 지원하는 조명에 등록
+register_command(거실)
 
 ### 엘리베이터 ###
 # 엘리베이터, 일괄 제어 용도의 패킷이지만 엘리베이터 호출 용도로만 사용해도 무방
