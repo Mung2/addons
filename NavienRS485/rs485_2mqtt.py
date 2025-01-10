@@ -221,32 +221,27 @@ class Wallpad:
 
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
-        try:
-            # 예외 처리: 전열교환기의 percentage 값이 0일 경우, power OFF로 처리
-            if topic_split[2] == "전열교환기" and topic_split[3] == "percentage" and topic_split[4] == "set" and msg.payload == b'0':
-                topic_split[3] = "power"
+        # print(topic_split)
+        # print(msg.payload)
+        try:            
+            # 예외처리 - 전열교환기 pesentage가 0일 경우, 전원으로 치환
+            if topic_split[2]=="전열교환기" and topic_split[3]=="percentage" and topic_split[4]=="set" and msg.payload==b'0':
+                topic_split[3]="power"
                 msg.payload = b'OFF'
-
+            
             device = self.get_device(device_name=topic_split[2])
-
-            if len(device.child_devices) > 0:
-                payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
+            if len(device.child_devices)>0:
+                payload = device.get_command_payload(topic_split[3], msg.payload.decode(),child_name=topic_split[2])
             else:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-
-            # 명령 전송 (최대 3회 재시도 및 딜레이 추가)
-            for attempt in range(3):
-                result = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-                time.sleep(0.1)  # 100ms 딜레이
-                if result.rc == mqtt.MQTT_ERR_SUCCESS:  # 성공 시 종료
-                    break
-            else:
-                print(f"Failed to send command after 3 attempts: {payload}")
-
+                
+            # print(payload)
+            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
-
+            
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
 
