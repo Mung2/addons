@@ -1,6 +1,6 @@
 {
   "name": "Navien Wallpad Controller with RS485(EW11)",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "slug": "navien_wallpad",
   "description": "Navien Wallpad Controller for Homeassistant",
   "arch": [
@@ -10,7 +10,7 @@
     "amd64",
     "i386"
   ],
-  "url": "https://github.com/JeongTaehun/addons",
+  "url": "https://github.com/Mung2/addons",
   "startup": "application",
   "boot": "auto",
   "uart": true,
