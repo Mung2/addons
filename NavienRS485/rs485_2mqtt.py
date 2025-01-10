@@ -5,6 +5,7 @@ from functools import reduce
 from collections import defaultdict
 import json
 import threading
+import time
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
@@ -149,6 +150,9 @@ class Wallpad:
         self._device_list = []
         # Lock 객체 추가
         self.command_lock = threading.Lock()
+        # 메시지 발송 후 ACK을 기다리는 타이머
+        self.packet_sent_time = None
+        self.retry_wait_time = 1  # 재전송 대기 시간 (초)
         
     def listen(self):
         self.register_mqtt_discovery()
@@ -244,15 +248,17 @@ class Wallpad:
         # 패킷 발송 (예시: client.publish)
         print(f"Sending packet: {payload}")  # 디버깅용 출력
         client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-        # 0.6초 후 두 번째 패킷 발송
-        import time
-        time.sleep(0.6)  # 600ms 딜레이
-        print(f"Re-sending packet: {payload}")  # 디버깅용 출력
-        client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=1, retain=False)
-        time.sleep(0.6)  # 600ms 딜레이
-        print(f"Re-sending packet: {payload}")  # 디버깅용 출력
-        client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=1, retain=False)
     
+    def on_publish(self, client, userdata, mid):
+        # 발송된 메시지에 대한 ACK을 받았을 때 호출
+        print(f"Message with mid {mid} has been acknowledged.")
+        # 메시지 발송 후 ACK 확인 후 재전송 하지 않음
+        if self.packet_sent_time:
+            ack_time = time.time()
+            if ack_time - self.packet_sent_time > self.retry_wait_time:
+                print(f"Acknowledgement received in {ack_time - self.packet_sent_time} seconds")
+            self.packet_sent_time = None
+            
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
 
