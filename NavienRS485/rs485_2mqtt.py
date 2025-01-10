@@ -4,6 +4,16 @@ from json import dumps as json_dumps
 from functools import reduce
 from collections import defaultdict
 import json
+import threading
+import queue
+import random
+import time
+import logging
+
+# 전역 변수 설정
+send_lock = threading.Lock()  # 멀티스레딩 락
+ack_data = []  # ACK 데이터 리스트
+ack_q = queue.Queue()  # ACK 대기 큐
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
@@ -45,44 +55,32 @@ class Device:
         result = {}
         for status in self.status_messages[payload_dict['message_flag']]:
             parse_status = re.match(status['regex'], payload_dict['data'])
-            # print(status['regex'], payload_dict['data'])
-            # print(parse_status)
             if len(self.child_devices)>0:
                 for index, child_device in enumerate(self.child_devices):
                     topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
-                    # climate일 경우 비트연산으로 예외발생..                    
                     if (status['attr_name']=="power" or status['attr_name']=="away_mode") and self.device_class=="climate":
                         result[topic] = status['process_func'](int(parse_status.group(1), 16) & (1 << index))
                     else:
                         result[topic] = status['process_func'](parse_status.group(index+1))
-                    
             else:
                 topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{self.device_name}/{status['attr_name']}"    
                 result[topic] = status['process_func'](parse_status.group(1))
-                # print(result[topic])
         return result
 
     def get_command_payload(self, attr_name, attr_value, child_name=None):
-        # print(self.device_name, self.device_subid, attr_value)
         attr_value = self.command_messages[attr_name]['process_func'](attr_value)
         if child_name is not None:
             idx = [child + self.device_name for child in self.child_devices].index(child_name)
-            # print(self.child_devices,idx,self.command_messages[attr_name]['controll_id'][idx])
             command_payload = ['f7', self.device_id, self.command_messages[attr_name]['controll_id'][idx],
                             self.command_messages[attr_name]['message_flag'], '01', attr_value]
-        # 예외처리 엘베 호출
         elif self.device_id=='33' and self.command_messages[attr_name]['message_flag']=='81':
             command_payload = ['f7', self.device_id, self.device_subid,
                             self.command_messages[attr_name]['message_flag'], '03', '00', attr_value, '00']
         else:            
             command_payload = ['f7', self.device_id, self.device_subid,
                             self.command_messages[attr_name]['message_flag'], '00']
-        # print(self.command_messages[attr_name]['message_flag'])
-        # print(command_payload)
         command_payload.append(Wallpad.xor(command_payload))
         command_payload.append(Wallpad.add(command_payload))
-        # print(command_payload)
-        # print(bytearray.fromhex(' '.join(command_payload)))
         return bytearray.fromhex(' '.join(command_payload))
 
     def get_mqtt_discovery_payload(self):        
@@ -90,8 +88,7 @@ class Device:
         if len(self.child_devices)>0:            
             for idx, child in enumerate(self.child_devices):
                 unique_id_join = self.device_unique_id + str(idx)
-                device_name_join = child + self.device_name;
-                # print(unique_id_join, device_name_join)
+                device_name_join = child + self.device_name
                 topic = f"{HOMEASSISTANT_ROOT_TOPIC_NAME}/{self.device_class}/{unique_id_join}/config"
                 result = {
                     '~': f"{ROOT_TOPIC_NAME}/{self.device_class}/{device_name_join}",
@@ -134,6 +131,7 @@ class Device:
             discovery_list.append((topic, json_dumps(result, ensure_ascii=False)))
             
         return discovery_list
+
     def get_status_attr_list(self):
         return list(set(status['attr_name'] for status_list in self.status_messages.values() for status in status_list))
 
@@ -178,71 +176,68 @@ class Wallpad:
     def get_topic_list_to_listen(self):
         return [f"{ROOT_TOPIC_NAME}/{device.device_class}/{child_name}{device.device_name}/{attr_name}/set" 
                 for device in self._device_list 
-                for child_name in (device.child_devices if device.child_devices else [""])  # child_devices가 없는 경우 빈 문자열 사용
+                for child_name in (device.child_devices if device.child_devices else [""])  
                 for attr_name in device.get_status_attr_list()]
 
-    @classmethod
-    def xor(cls, hexstring_array):
-        return format(reduce(lambda x, y: x ^ y, map(lambda x: int(x, 16), hexstring_array)), '02x')
-
-    @classmethod
-    def add(cls, hexstring_array):
-        return format(reduce(lambda x, y: x + y, map(lambda x: int(x, 16), hexstring_array)), '02x')[-2:]
-
-    @classmethod
-    def is_valid(cls, payload_hexstring):
-        payload_array = [payload_hexstring[i:i+2] for i in range(0, len(payload_hexstring), 2)]
-        try:
-            valid = int(payload_array[4], 16) + 7 == len(payload_array) and \
-                    cls.xor(payload_array[:-2]) == payload_array[-2:-1][0] and \
-                    cls.add(payload_array[:-1]) == payload_array[-1:][0]
-            return valid
-        except:
-            return False
-
-    def on_raw_message(self, client, userdata, msg):
-        if msg.topic == f"{ROOT_TOPIC_NAME}/dev/raw":
-            self._process_raw_message(client, msg)
-        else:
-            print(msg.topic)    
-            self._process_command_message(client, msg)
-
-    def _process_raw_message(self, client, msg):
-        for payload_raw_bytes in msg.payload.split(b'\xf7')[1:]:
-            payload_hexstring = 'f7' + payload_raw_bytes.hex()
+    def send_packet(self, client, payload, log=None, check_ack=True):
+        send_lock.acquire()  # 락을 획득하여 동시 실행 방지
+        ack_data.clear()  # ACK 데이터를 초기화
+        ret = False
+        for seq_h in seq_t_dic.keys():  # 시퀀스 키에 대해 반복 (ACK을 못 받으면 다른 시퀀스로 재시도)
+            send_data = header_h + payload + seq_h + '00' + chksum(payload) + trailer_h
             try:
-                if self.is_valid(payload_hexstring):                    
-                    payload_dict = self._parse_payload(payload_hexstring)
-                    self._publish_device_payload(client, payload_dict)
-                else:
-                    continue
-            except Exception:
-                client.publish(f"{ROOT_TOPIC_NAME}/dev/error", payload_hexstring, qos=1, retain=True)
+                if client.write(bytearray.fromhex(send_data)) == False:
+                    raise Exception('Not ready')
+            except Exception as ex:
+                logging.error("[RS485] Write error.[{}]".format(ex))
+                break
+            if log is not None:
+                logging.info('[SEND|{}] {}'.format(log, send_data))
+            
+            if not check_ack:
+                time.sleep(1)  # ACK을 기다리지 않고 바로 반환
+                ret = send_data
+                break
+            
+            ack_data.append(type_h_dic['ack'] + seq_h + '00' + payload)  
+            try:
+                ack_q.get(True, 1.3 + 0.2 * random.random())
+                logging.info('[ACK] OK')
+                ret = send_data
+                break
+            except queue.Empty:
+                logging.warning('[ACK] Timeout, retrying...')
+                pass
+        
+        if not ret:
+            logging.info('[RS485] Send failed. Closing connection and retrying...')
+            client.close() 
+        
+        ack_data.clear()  
+        send_lock.release()  
+        return ret
 
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
-        # print(topic_split)
-        # print(msg.payload)
         try:            
-            # 예외처리 - 전열교환기 pesentage가 0일 경우, 전원으로 치환
-            #if topic_split[2]=="전열교환기" and topic_split[3]=="percentage" and topic_split[4]=="set" and msg.payload==b'0':
-                #topic_split[3]="power"
-                #msg.payload = b'OFF'
-            
             device = self.get_device(device_name=topic_split[2])
-            if len(device.child_devices)>0:
-                payload = device.get_command_payload(topic_split[3], msg.payload.decode(),child_name=topic_split[2])
+            if len(device.child_devices) > 0:
+                payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
             else:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
             
-            # print(payload)    
-            import time
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            time.sleep(0.3)  # 300ms 딜레이
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+            send_result = self.send_packet(client, payload, log=topic_split[3], check_ack=True)
+
+            if send_result:
+                logging.info("Command sent successfully: {}".format(send_result))
+            else:
+                logging.error("Failed to send command after retries.")
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
+
+    # 기존의 나머지 메소드들...
+
             
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
