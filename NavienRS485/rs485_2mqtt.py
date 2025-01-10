@@ -244,7 +244,15 @@ class Wallpad:
         # 패킷 발송 (예시: client.publish)
         print(f"Sending packet: {payload}")  # 디버깅용 출력
         client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-        
+        # 0.6초 후 두 번째 패킷 발송
+        import time
+        time.sleep(0.6)  # 600ms 딜레이
+        print(f"Re-sending packet: {payload}")  # 디버깅용 출력
+        client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=1, retain=False)
+        time.sleep(0.6)  # 600ms 딜레이
+        print(f"Re-sending packet: {payload}")  # 디버깅용 출력
+        client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=1, retain=False)
+    
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
 
