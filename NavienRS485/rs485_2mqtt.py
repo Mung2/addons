@@ -225,9 +225,9 @@ class Wallpad:
         # print(msg.payload)
         try:            
             # 예외처리 - 전열교환기 pesentage가 0일 경우, 전원으로 치환
-            if topic_split[2]=="전열교환기" and topic_split[3]=="percentage" and topic_split[4]=="set" and msg.payload==b'0':
-                topic_split[3]="power"
-                msg.payload = b'OFF'
+            #if topic_split[2]=="전열교환기" and topic_split[3]=="percentage" and topic_split[4]=="set" and msg.payload==b'0':
+                #topic_split[3]="power"
+                #msg.payload = b'OFF'
             
             device = self.get_device(device_name=topic_split[2])
             if len(device.child_devices)>0:
