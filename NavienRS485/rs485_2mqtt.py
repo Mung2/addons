@@ -135,11 +135,10 @@ class Device:
     def get_status_attr_list(self):
         return list(set(status['attr_name'] for status_list in self.status_messages.values() for status in status_list))
 
-
 class Wallpad:
     def __init__(self):
         self.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-        self.mqtt_client.on_message = self.on_raw_message
+        self.mqtt_client.on_message = self.on_raw_message  # on_message 핸들러 설정
         self.mqtt_client.on_disconnect = self.on_disconnect
         self.mqtt_client.username_pw_set(username=MQTT_USERNAME, password=MQTT_PASSWORD)
         self.mqtt_client.connect(MQTT_SERVER, 1883)
@@ -151,6 +150,26 @@ class Wallpad:
             print(topic_list)
         self.mqtt_client.subscribe([(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()])
         self.mqtt_client.loop_forever()
+
+    def on_raw_message(self, client, userdata, msg):
+        """
+        MQTT 메시지를 수신했을 때 처리하는 콜백 함수입니다.
+        수신한 메시지에 대해 적절한 처리를 해주세요.
+        """
+        print(f"Received message: {msg.payload.decode()} on topic: {msg.topic}")
+
+        # 예시: 특정 주제에 대해 필터링하고 다른 작업을 수행하는 코드 추가
+        if msg.topic == "some/topic":
+            print(f"Processing message on {msg.topic}")
+        # 그 외 필요한 작업을 추가할 수 있습니다.
+
+    def on_disconnect(self, client, userdata, rc):
+        """MQTT 클라이언트가 연결 끊겼을 때 호출되는 콜백 함수입니다."""
+        if rc != 0:
+            print(f"Disconnected from MQTT broker with code {rc}")
+        else:
+            print("Successfully disconnected from MQTT broker.")
+
 
     def register_mqtt_discovery(self):
         for device in self._device_list:
