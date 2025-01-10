@@ -272,6 +272,9 @@ packet_2_payload_percentage = {'01': '1', '02': '2', '03': '3'}
 power_2_packet = {'OFF': '00', 'ON': '01'}
 mode_2_packet = {'일반': '01', '전열': '03', '자동': '04'}
 percentage_2_packet = {'1': '01', '2': '02', '3': '03'}
+# 등록
+optional_info = {'optimistic': 'false', 'speed_range_min': 1, 'speed_range_max': 3}
+전열교환기 = wallpad.add_device(device_name='전열교환기', device_id='32', device_subid='01', device_class='fan', optional_info=optional_info)
 # 상태 등록
 전열교환기.register_status(
     message_flag='81',
