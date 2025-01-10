@@ -266,11 +266,11 @@ wallpad = Wallpad()
 ## 전열교환기
 # 상태 매핑
 packet_2_payload_power = {'00': 'OFF', '01': 'ON'}
-packet_2_payload_mode = {'01': '일반', '03': '전열', '04': '자동'}
+packet_2_payload_mode = {'01': '일반', '03': '전열'}
 packet_2_payload_percentage = {'01': '1', '02': '2', '03': '3'}
 # 명령 매핑
 power_2_packet = {'OFF': '00', 'ON': '01'}
-mode_2_packet = {'일반': '01', '전열': '03', '자동': '04'}
+mode_2_packet = {'일반': '01', '전열': '03'}
 percentage_2_packet = {'1': '01', '2': '02', '3': '03'}
 # 등록
 optional_info = {'optimistic': 'false', 'speed_range_min': 1, 'speed_range_max': 3}
@@ -280,19 +280,19 @@ optional_info = {'optimistic': 'false', 'speed_range_min': 1, 'speed_range_max':
     message_flag='81',
     attr_name='power',
     topic_class='state_topic',
-    regex=r'000[01]00[01]0[0-3]00',
+    regex=r'00(0[01])',
     process_func=lambda v: packet_2_payload_power[v])
 전열교환기.register_status(
     message_flag='81',
     attr_name='mode',
     topic_class='mode_state_topic',
-    regex=r'000[01]0[0-3]0([0134])00',
+    regex=r'00010[123]0[13]',
     process_func=lambda v: packet_2_payload_mode[v])
 전열교환기.register_status(
     message_flag='81',
     attr_name='percentage',
     topic_class='percentage_state_topic',
-    regex=r'000[01](0[1-3])0[013]00',
+    regex=r'0001(0[1-3])',
     process_func=lambda v: packet_2_payload_percentage[v])
 # 명령 등록
 전열교환기.register_command(
