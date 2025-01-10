@@ -261,18 +261,22 @@ class Wallpad:
 # 새로운 Wallpad 클래스와 Device 클래스 정의
 wallpad = Wallpad()
 
-## 전열교환기
-# 등록
+packet_2_payload_percentage = {'00': '0', '01': '1', '02': '2', '03': '3'}
+packet_2_payload_oscillation = {'03': 'oscillate_on', '00': 'oscillation_off', '01': 'oscillate_off'}
+### 전열교환기 ###
 optional_info = {'optimistic': 'false', 'speed_range_min': 1, 'speed_range_max': 3}
-전열교환기 = wallpad.add_device(device_name='전열교환기', device_id='32', device_subid='01', device_class='fan', optional_info=optional_info)
-# 상태 등록
-전열교환기.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'00(0[01])', process_func=lambda v: 'ON' if v == '01' else 'OFF')
-전열교환기.register_status(message_flag='81', attr_name='mode', topic_class='mode_state_topic', regex=r'00010[123]0[13]', process_func=lambda v: 'bypass' if v[6:8] == '01' else 'heat')
-전열교환기.register_status(message_flag='81', attr_name='percentage', topic_class='percentage_state_topic', regex=r'0001(0[1-3])', process_func=lambda v: {'01': '1', '02': '2', '03': '3'}.get(v[4:6], 'OFF'))
-# 명령 등록
-전열교환기.register_command(message_flag='41', attr_name='power', topic_class='command_topic', process_func=lambda v: 'ON' if v == '01' else 'OFF')
-전열교환기.register_command(message_flag='43', attr_name='mode', topic_class='mode_command_topic', process_func=lambda v: 'bypass' if v[6:8] == '01' else 'heat')
-전열교환기.register_command(message_flag='42', attr_name='percentage', topic_class='percentage_command_topic', process_func=lambda v: {'01': '1', '02': '2', '03': '3'}.get(v[4:6], 'OFF'))
+전열교환기 = wallpad.add_device(device_name = '전열교환기', device_id = '32', device_subid = '01', device_class = 'fan', optional_info = optional_info)
+전열교환기.register_status(message_flag = '01', attr_name = 'availability', topic_class ='availability_topic',      regex = r'()', process_func = lambda v: 'online')
+전열교환기.register_status(message_flag = '81', attr_name = 'power',        topic_class ='state_topic',             regex = r'00(0[01])0[0-3]0[013]00', process_func = lambda v: 'ON' if v == '01' else 'OFF')
+전열교환기.register_status(message_flag = 'c1', attr_name = 'power',        topic_class ='state_topic',             regex = r'00(0[01])0[0-3]0[013]00', process_func = lambda v: 'ON' if v == '01' else 'OFF')
+전열교환기.register_status(message_flag = '81', attr_name = 'percentage',   topic_class ='percentage_state_topic',  regex = r'000[01](0[0-3])0[013]00', process_func = lambda v: packet_2_payload_percentage[v])
+전열교환기.register_status(message_flag = 'c2', attr_name = 'percentage',   topic_class ='percentage_state_topic',  regex = r'000[01](0[0-3])0[013]00', process_func = lambda v: packet_2_payload_percentage[v])
+전열교환기.register_status(message_flag = '81', attr_name = 'heat',         topic_class ='oscillation_state_topic', regex = r'000[01]0[0-3](0[013])00', process_func = lambda v: packet_2_payload_oscillation[v])
+전열교환기.register_status(message_flag = 'c3', attr_name = 'heat',         topic_class ='oscillation_state_topic', regex = r'000[01]0[0-3](0[013])00', process_func = lambda v: packet_2_payload_oscillation[v])
+
+전열교환기.register_command(message_flag = '41', attr_name = 'power',       topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')
+전열교환기.register_command(message_flag = '42', attr_name = 'percentage',  topic_class = 'percentage_command_topic', process_func = lambda v: {payload: packet for packet, payload in packet_2_payload_percentage.items()}[v])
+전열교환기.register_command(message_flag = '43', attr_name = 'heat',        topic_class = 'oscillation_command_topic', process_func = lambda v: {payload: packet for packet, payload in packet_2_payload_oscillation.items()}[v])
 
 # 가스차단기
 optional_info = {'optimistic': 'false'}
