@@ -4,8 +4,6 @@ from json import dumps as json_dumps
 from functools import reduce
 from collections import defaultdict
 import json
-import random
-import time
 import threading
 
 MQTT_USERNAME = 'admin'
@@ -149,10 +147,9 @@ class Wallpad:
         self.mqtt_client.username_pw_set(username=MQTT_USERNAME, password=MQTT_PASSWORD)
         self.mqtt_client.connect(MQTT_SERVER, 1883)
         self._device_list = []
-        self.lock = threading.Lock()  # 명령 처리 동기화
-        self.retry_limit = 3  # 재시도 횟수
-        self.base_delay = 1  # 초기 지연 시간 1초
-
+        # Lock 객체 추가
+        self.command_lock = threading.Lock()
+        
     def listen(self):
         self.register_mqtt_discovery()
         for topic_list in [(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()]:
@@ -228,81 +225,25 @@ class Wallpad:
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
         try:
-            # 디바이스와 명령 페이로드 처리
-            device = self.get_device(device_name=topic_split[2])
-            if len(device.child_devices) > 0:
-                payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
-            else:
-                payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-
-            # 명령 발송 및 ACK 대기
-            with self.lock:
-                self._send_command_with_retry(client, payload)
-
-        except Exception as e:
-            print(f"Error: {str(e)}")
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
-
-    def _send_command_with_retry(self, client, payload):
-        retries = 0
-        delay = self.base_delay  # 초기 지연 시간 설정
-        
-        while retries < self.retry_limit:
-            try:
-                # 패킷 발송
-                self._send_packet(client, payload)
-                # ACK 수신을 기다리고, 정상적으로 처리되면 종료
-                if self._wait_for_ack(client):
-                    return  # 정상적으로 ACK을 받은 경우 종료
+            # 명령을 처리할 때, Lock을 획득합니다.
+            with self.command_lock:
+                device = self.get_device(device_name=topic_split[2])
+                if len(device.child_devices) > 0:
+                    payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
                 else:
-                    raise TimeoutError("ACK not received.")
-            except TimeoutError as e:
-                # ACK을 받지 못한 경우 지수적 백오프를 적용
-                print(f"Timeout: {str(e)}, retrying in {delay} seconds...")
-                time.sleep(delay)
-                retries += 1
-                delay *= 2  # 지수적 백오프
+                    payload = device.get_command_payload(topic_split[3], msg.payload.decode())
 
-        print("Failed to receive ACK after retries.")
-        client.publish(f"{ROOT_TOPIC_NAME}/dev/error", "Error: ACK timeout after retries", qos=1, retain=True)
+                # 명령 발송
+                self._send_packet(client, payload)
 
+        except ValueError as e:
+            print(e)
+            client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
+            
     def _send_packet(self, client, payload):
         # 패킷 발송 (예시: client.publish)
-        client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=1, retain=False)
-
-    def _wait_for_ack(self, client):
-        # ACK을 기다리는 로직 (상태 패킷을 통해 ACK으로 간주)
-        # 예시: 상태 패킷을 통해 ACK을 받았는지 확인
-        # 상태 패킷을 처리하는 로직이 여기에 구현되어야 합니다.
-        # 예를 들어, 특정 시간 안에 상태 패킷을 받으면 ACK으로 간주하고 True를 리턴
-        start_time = time.time()
-        timeout = 5  # 5초 이내로 상태 패킷이 오지 않으면 실패로 간주
-        while time.time() - start_time < timeout:
-            if self._check_for_status_packet(client):
-                return True
-            time.sleep(0.1)  # 짧은 대기 후 상태 패킷 확인
-        return False
-
-    def _check_for_status_packet(self, client):
-        # 상태 패킷을 확인하는 로직
-        # 예시: 상태 패킷을 확인하여 결과를 리턴
-        # 상태 패킷이 오면 ACK을 받은 것으로 간주하고 True 리턴
-        # 예시로 임의로 상태 패킷이 오면 True를 리턴
-        return random.choice([True, False])  # 임시로 랜덤하게 상태 패킷을 받는 것으로 설정
-
-    # 예시로 get_device와 같은 메서드를 정의할 수 있습니다.
-    def get_device(self, device_name):
-        # 디바이스 찾는 로직
-        return Device(device_name)
-
-class Device:
-    def __init__(self, name):
-        self.name = name
-        self.child_devices = []  # 자식 장치 목록
-
-    def get_command_payload(self, command, payload, child_name=None):
-        # 명령에 맞는 페이로드를 생성하는 로직
-        return f"Payload for {command} with {payload}"
+        print(f"Sending packet: {payload}")  # 디버깅용 출력
+        client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
         
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
