@@ -236,11 +236,11 @@ class Wallpad:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
                 
             # print(payload)
-            for attempt in range(3):  # 두 번 시도
-                result = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+            for attempt in range(4):  # 두 번 시도
+                result = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=1, retain=False)
                 if result.rc == mqtt.MQTT_ERR_SUCCESS:
                     break  # 성공 시 루프 종료
-                time.sleep(0.2)  # 100ms 딜레이
+                time.sleep(0.3)  # 300ms 딜레이
             else:
                 print(f"Failed to send command after 2 attempts: {payload}")
                 
