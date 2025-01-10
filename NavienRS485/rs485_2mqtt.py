@@ -269,12 +269,12 @@ optional_info = {'optimistic': 'false', 'speed_range_min': 1, 'speed_range_max':
 전열교환기 = wallpad.add_device(device_name='전열교환기', device_id='32', device_subid='01', device_class='fan', optional_info=optional_info)
 # 상태 등록
 전열교환기.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'00(0[01])', process_func=lambda v: 'ON' if v == '01' else 'OFF')
-전열교환기.register_status(message_flag='81', attr_name='mode', topic_class='mode_state_topic', regex=r'00010[123]0[13]', process_func=lambda v: {'01': 'bypass', '03': 'heat'}.get(v, 'off')
-전열교환기.register_status(message_flag='81', attr_name='percentage', topic_class='percentage_state_topic', regex=r'0001(0[1-3])', process_func=lambda v: {'01': '1', '02': '2', '03': '3'}.get(v, 'OFF')
+전열교환기.register_status(message_flag='81', attr_name='mode', topic_class='mode_state_topic', regex=r'00010[123]0[13]', process_func=lambda v: {'01': 'bypass', '03': 'heat'}.get(v, 'off'))
+전열교환기.register_status(message_flag='81', attr_name='percentage', topic_class='percentage_state_topic', regex=r'0001(0[1-3])', process_func=lambda v: {'01': '1', '02': '2', '03': '3'}.get(v, 'OFF'))
 # 명령 등록
 전열교환기.register_command(message_flag='41', attr_name='power', topic_class='command_topic', process_func=lambda v: 'ON' if v == '01' else 'OFF')
-전열교환기.register_command(message_flag='43', attr_name='mode', topic_class='mode_command_topic', process_func=lambda v: {'01': 'bypass', '03': 'heat'}.get(v, 'off')
-전열교환기.register_command(message_flag='42', attr_name='percentage', topic_class='percentage_command_topic', process_func=lambda v: {'01': '1', '02': '2', '03': '3'}.get(v, 'OFF')
+전열교환기.register_command(message_flag='43', attr_name='mode', topic_class='mode_command_topic', process_func=lambda v: {'01': 'bypass', '03': 'heat'}.get(v, 'off'))
+전열교환기.register_command(message_flag='42', attr_name='percentage', topic_class='percentage_command_topic', process_func=lambda v: {'01': '1', '02': '2', '03': '3'}.get(v, 'OFF'))
 
 # 가스차단기
 optional_info = {'optimistic': 'false'}
