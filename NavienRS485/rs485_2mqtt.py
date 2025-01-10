@@ -221,22 +221,28 @@ class Wallpad:
 
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
-        # print(topic_split)
-        # print(msg.payload)
-        try:            
-            # 예외처리 - 전열교환기 pesentage가 0일 경우, 전원으로 치환
-            if topic_split[2]=="전열교환기" and topic_split[3]=="percentage" and topic_split[4]=="set" and msg.payload==b'0':
-                topic_split[3]="power"
+        try:
+            # 예외 처리: 전열교환기의 percentage 값이 0일 경우, power OFF로 처리
+            if topic_split[2] == "전열교환기" and topic_split[3] == "percentage" and topic_split[4] == "set" and msg.payload == b'0':
+                topic_split[3] = "power"
                 msg.payload = b'OFF'
-            
+
             device = self.get_device(device_name=topic_split[2])
-            if len(device.child_devices)>0:
-                payload = device.get_command_payload(topic_split[3], msg.payload.decode(),child_name=topic_split[2])
+
+            if len(device.child_devices) > 0:
+                payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
             else:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-                
-            # print(payload)
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+
+            # 명령 전송 (최대 3회 재시도 및 딜레이 추가)
+            for attempt in range(3):
+                result = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+                time.sleep(0.1)  # 100ms 딜레이
+                if result.rc == mqtt.MQTT_ERR_SUCCESS:  # 성공 시 종료
+                    break
+            else:
+                print(f"Failed to send command after 3 attempts: {payload}")
+
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
@@ -263,20 +269,14 @@ wallpad = Wallpad()
 packet_2_payload_percentage = {'00': '0', '01': '1', '02': '2', '03': '3'}
 packet_2_payload_oscillation = {'03': 'oscillate_on', '00': 'oscillation_off', '01': 'oscillate_off'}
 
-### 전열교환기 ###
+# 전열교환기
 optional_info = {'optimistic': 'false', 'speed_range_min': 1, 'speed_range_max': 3}
-전열교환기 = wallpad.add_device(device_name = '전열교환기', device_id = '32', device_subid = '01', device_class = 'fan', optional_info = optional_info)
-전열교환기.register_status(message_flag = '01', attr_name = 'availability', topic_class ='availability_topic',      regex = r'()', process_func = lambda v: 'online')
-전열교환기.register_status(message_flag = '81', attr_name = 'power',        topic_class ='state_topic',             regex = r'00(0[01])0[0-3]0[013]00', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-전열교환기.register_status(message_flag = 'c1', attr_name = 'power',        topic_class ='state_topic',             regex = r'00(0[01])0[0-3]0[013]00', process_func = lambda v: 'ON' if v == '01' else 'OFF')
-전열교환기.register_status(message_flag = '81', attr_name = 'percentage',   topic_class ='percentage_state_topic',  regex = r'000[01](0[0-3])0[013]00', process_func = lambda v: packet_2_payload_percentage[v])
-전열교환기.register_status(message_flag = 'c2', attr_name = 'percentage',   topic_class ='percentage_state_topic',  regex = r'000[01](0[0-3])0[013]00', process_func = lambda v: packet_2_payload_percentage[v])
-전열교환기.register_status(message_flag = '81', attr_name = 'heat',         topic_class ='oscillation_state_topic', regex = r'000[01]0[0-3](0[013])00', process_func = lambda v: packet_2_payload_oscillation[v])
-전열교환기.register_status(message_flag = 'c3', attr_name = 'heat',         topic_class ='oscillation_state_topic', regex = r'000[01]0[0-3](0[013])00', process_func = lambda v: packet_2_payload_oscillation[v])
-
-전열교환기.register_command(message_flag = '41', attr_name = 'power',       topic_class = 'command_topic', process_func = lambda v: '01' if v =='ON' else '00')
-전열교환기.register_command(message_flag = '42', attr_name = 'percentage',  topic_class = 'percentage_command_topic', process_func = lambda v: {payload: packet for packet, payload in packet_2_payload_percentage.items()}[v])
-전열교환기.register_command(message_flag = '43', attr_name = 'heat',        topic_class = 'oscillation_command_topic', process_func = lambda v: {payload: packet for packet, payload in packet_2_payload_oscillation.items()}[v])
+전열교환기 = wallpad.add_device(device_name='전열교환기', device_id='32', device_subid='01', device_class='fan', optional_info=optional_info)
+전열교환기.register_status(message_flag='01', attr_name='availability', topic_class='availability_topic', regex=r'()', process_func=lambda v: 'online')
+전열교환기.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'00(0[01])0[0-3]0[013]00', process_func=lambda v: 'ON' if v == '01' else 'OFF')
+전열교환기.register_status(message_flag='81', attr_name='percentage', topic_class='percentage_state_topic', regex=r'000[01](0[0-3])0[013]00', process_func=lambda v: packet_2_payload_percentage[v])
+전열교환기.register_command(message_flag='41', attr_name='power', topic_class='command_topic', process_func=lambda v: '01' if v == 'ON' else '00')
+전열교환기.register_command(message_flag='42', attr_name='percentage', topic_class='percentage_command_topic', process_func=lambda v: {payload: packet for packet, payload in packet_2_payload_percentage.items()}[v])
 
 # 가스차단기
 optional_info = {'optimistic': 'false'}
