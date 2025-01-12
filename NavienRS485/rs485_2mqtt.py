@@ -4,6 +4,9 @@ from json import dumps as json_dumps
 from functools import reduce
 from collections import defaultdict
 import json
+from concurrent.futures import ThreadPoolExecutor
+
+executor = ThreadPoolExecutor(max_workers=10)
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
@@ -151,7 +154,7 @@ class Wallpad:
         for topic_list in [(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()]:
             print(topic_list)
         self.mqtt_client.subscribe([(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()])
-        self.mqtt_client.loop_forever()
+        self.mqtt_client.loop_start()
 
     def register_mqtt_discovery(self):
         for device in self._device_list:
@@ -201,10 +204,9 @@ class Wallpad:
 
     def on_raw_message(self, client, userdata, msg):
         if msg.topic == f"{ROOT_TOPIC_NAME}/dev/raw":
-            self._process_raw_message(client, msg)
+            executor.submit(self._process_raw_message, client, msg)
         else:
-            print(msg.topic)    
-            self._process_command_message(client, msg)
+            executor.submit(self._process_command_message, client, msg)
 
     def _process_raw_message(self, client, msg):
         for payload_raw_bytes in msg.payload.split(b'\xf7')[1:]:
