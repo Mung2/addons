@@ -147,12 +147,7 @@ class Wallpad:
         self.mqtt_client.username_pw_set(username=MQTT_USERNAME, password=MQTT_PASSWORD)
         self.mqtt_client.connect(MQTT_SERVER, 1883)
         self._device_list = []
-        # Lock 객체 추가
-        self.command_lock = threading.Lock()
-        # 메시지 발송 후 ACK을 기다리는 타이머
-        self.packet_sent_time = None
-        self.retry_wait_time = 1  # 재전송 대기 시간 (초)
-        
+
     def listen(self):
         self.register_mqtt_discovery()
         for topic_list in [(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()]:
@@ -227,37 +222,26 @@ class Wallpad:
 
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
-        try:
-            # 명령을 처리할 때, Lock을 획득합니다.
-            with self.command_lock:
-                device = self.get_device(device_name=topic_split[2])
-                if len(device.child_devices) > 0:
-                    payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
-                else:
-                    payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-
-                # 명령 발송
-                self._send_packet(client, payload)
-
+        # print(topic_split)
+        # print(msg.payload)
+        try:            
+            # 예외처리 - 전열교환기 pesentage가 0일 경우, 전원으로 치환
+            if topic_split[2]=="전열교환기" and topic_split[3]=="percentage" and topic_split[4]=="set" and msg.payload==b'0':
+                topic_split[3]="power"
+                msg.payload = b'OFF'
+            
+            device = self.get_device(device_name=topic_split[2])
+            if len(device.child_devices)>0:
+                payload = device.get_command_payload(topic_split[3], msg.payload.decode(),child_name=topic_split[2])
+            else:
+                payload = device.get_command_payload(topic_split[3], msg.payload.decode())
+                
+            # print(payload)
+            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
-            
-    def _send_packet(self, client, payload):
-        # 패킷 발송 (예시: client.publish)
-        print(f"Sending packet: {payload}")  # 디버깅용 출력
-        client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-    
-    def on_publish(self, client, userdata, mid):
-        # 발송된 메시지에 대한 ACK을 받았을 때 호출
-        print(f"Message with mid {mid} has been acknowledged.")
-        # 메시지 발송 후 ACK 확인 후 재전송 하지 않음
-        if self.packet_sent_time:
-            ack_time = time.time()
-            if ack_time - self.packet_sent_time > self.retry_wait_time:
-                print(f"Acknowledgement received in {ack_time - self.packet_sent_time} seconds")
-            self.packet_sent_time = None
-            
+
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
 
