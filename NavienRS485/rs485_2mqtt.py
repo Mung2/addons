@@ -4,8 +4,6 @@ from json import dumps as json_dumps
 from functools import reduce
 from collections import defaultdict
 import json
-import threading
-import time
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
