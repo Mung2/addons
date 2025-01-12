@@ -159,10 +159,12 @@ class Wallpad:
 
     def listen(self):
         self.register_mqtt_discovery()
+        # 구독할 토픽을 중복 제거하도록 수정
+        topics_to_subscribe = set([f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen())
         for topic_list in [(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()]:
             print(topic_list)
         self.mqtt_client.subscribe([(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()])
-        self.mqtt_client.loop_forever()
+        self.mqtt_client.loop_start()
 
     def register_mqtt_discovery(self):
         for device in self._device_list:
