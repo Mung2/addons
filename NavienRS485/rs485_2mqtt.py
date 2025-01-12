@@ -163,7 +163,11 @@ class Wallpad:
             if not self.command_queue.empty():
                 msg = self.command_queue.get()  # 큐에서 명령을 가져와 처리
                 with self.lock:  # 락을 사용하여 한 번에 하나의 명령만 처리
-                    self._process_command_message(self.mqtt_client, msg)
+                    # 큐에서 명령을 처리하고 즉시 전송
+                    topic_split = msg.topic.split('/')
+                    device = self.get_device(device_name=topic_split[2])
+                    payload = device.get_command_payload(topic_split[3], msg.payload.decode())
+                    self.mqtt_client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
             time.sleep(0.1)  # 0.1초마다 큐를 체크
 
     def register_mqtt_discovery(self):
