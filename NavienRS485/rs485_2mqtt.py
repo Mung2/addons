@@ -245,17 +245,12 @@ class Wallpad:
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
 
     def _publish_device_payload(self, client, payload_dict):
-        # 패킷 전송 전, 시간 차이를 확인하여 대기 시간을 조정합니다.
-        last_send_time = getattr(self, 'last_send_time', 0)
-        time_gap = time.time() - last_send_time
-        if time_gap < 0.5:  # 0.5초 이상 간격 두기
-            time.sleep(0.5 - time_gap)
-        # 이후 실제 패킷 전송
+        # print(payload_dict)
         device = self.get_device(device_id=payload_dict['device_id'], device_subid=payload_dict['device_subid'])
         for topic, value in device.parse_payload(payload_dict).items():
+            # print(topic)
+            # print(value)
             client.publish(topic, value, qos=1, retain=False)
-        # 전송 후, 마지막 전송 시간을 기록
-        self.last_send_time = time.time()
 
     def on_disconnect(self, client, userdata, rc):
         raise ConnectionError
