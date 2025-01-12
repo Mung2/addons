@@ -6,6 +6,7 @@ from collections import defaultdict
 import json
 import threading
 import time
+import queue
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
@@ -148,11 +149,10 @@ class Wallpad:
         self.mqtt_client.username_pw_set(username=MQTT_USERNAME, password=MQTT_PASSWORD)
         self.mqtt_client.connect(MQTT_SERVER, 1883)
         self._device_list = []
-        # Lock 객체 추가
-        self.command_lock = threading.Lock()
-        # 메시지 발송 후 ACK을 기다리는 타이머
-        self.packet_sent_time = None
-        self.retry_wait_time = 1  # 재전송 대기 시간 (초)
+        # 명령 큐 및 처리 스레드
+        self.command_queue = queue.Queue()
+        self.command_processor_thread = threading.Thread(target=self._process_command_queue, daemon=True)
+        self.command_processor_thread.start()
         
     def listen(self):
         self.register_mqtt_discovery()
@@ -225,39 +225,39 @@ class Wallpad:
                     continue
             except Exception:
                 client.publish(f"{ROOT_TOPIC_NAME}/dev/error", payload_hexstring, qos=1, retain=True)
+                
+    def _process_command_queue(self):
+        while True:
+            # 큐에서 명령을 하나씩 가져와 처리
+            client, payload = self.command_queue.get()
+            try:
+                self._send_packet(client, payload)
+            except Exception as e:
+                print(f"Error processing command: {e}")
+            finally:
+                self.command_queue.task_done()
 
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
         try:
-            # 명령을 처리할 때, Lock을 획득합니다.
-            with self.command_lock:
-                device = self.get_device(device_name=topic_split[2])
-                if len(device.child_devices) > 0:
-                    payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
-                else:
-                    payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-
-                # 명령 발송
-                self._send_packet(client, payload)
+            device = self.get_device(device_name=topic_split[2])
+            if len(device.child_devices) > 0:
+                payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
+            else:
+                payload = device.get_command_payload(topic_split[3], msg.payload.decode())
+            
+            # 명령을 큐에 추가
+            self.command_queue.put((client, payload))
 
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
-            
+
     def _send_packet(self, client, payload):
         # 패킷 발송 (예시: client.publish)
-        print(f"Sending packet: {payload}")  # 디버깅용 출력
+        print(f"Sending packet: {payload}")
         client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-    
-    def on_publish(self, client, userdata, mid):
-        # 발송된 메시지에 대한 ACK을 받았을 때 호출
-        print(f"Message with mid {mid} has been acknowledged.")
-        # 메시지 발송 후 ACK 확인 후 재전송 하지 않음
-        if self.packet_sent_time:
-            ack_time = time.time()
-            if ack_time - self.packet_sent_time > self.retry_wait_time:
-                print(f"Acknowledgement received in {ack_time - self.packet_sent_time} seconds")
-            self.packet_sent_time = None
+        time.sleep(0.5)  # 네트워크 안정성을 위해 약간의 대기 추가
             
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
