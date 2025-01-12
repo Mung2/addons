@@ -162,7 +162,7 @@ class Wallpad:
         for topic_list in [(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()]:
             print(topic_list)
         self.mqtt_client.subscribe([(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()])
-        self.mqtt_client.loop_start()
+        self.mqtt_client.loop_forever()
 
     def register_mqtt_discovery(self):
         for device in self._device_list:
