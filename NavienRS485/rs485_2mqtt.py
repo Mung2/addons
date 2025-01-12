@@ -149,26 +149,20 @@ class Wallpad:
         self.mqtt_client.username_pw_set(username=MQTT_USERNAME, password=MQTT_PASSWORD)
         self.mqtt_client.connect(MQTT_SERVER, 1883)
         self._device_list = []
+        
         self.lock = threading.Lock()  # 스레드 락
         self.command_queue = Queue()  # 큐 설정
-        
+        # 주기적으로 큐를 처리할 스레드를 시작
+        self.command_processor_thread = threading.Thread(target=self.process_command_queue)
+        self.command_processor_thread.daemon = True  # 메인 프로그램 종료 시 스레드도 종료됨
+        self.command_processor_thread.start()
+
     def listen(self):
         self.register_mqtt_discovery()
         for topic_list in [(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()]:
             print(topic_list)
         self.mqtt_client.subscribe([(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()])
-        self.mqtt_client.loop_start() # 비동기식 MQTT 루프
-        
-        while True:
-            if not self.command_queue.empty():
-                msg = self.command_queue.get()  # 큐에서 명령을 가져와 처리
-                with self.lock:  # 락을 사용하여 한 번에 하나의 명령만 처리
-                    # 큐에서 명령을 처리하고 즉시 전송
-                    topic_split = msg.topic.split('/')
-                    device = self.get_device(device_name=topic_split[2])
-                    payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-                    self.mqtt_client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            time.sleep(0.1)  # 0.1초마다 큐를 체크
+        self.mqtt_client.loop_start()
 
     def register_mqtt_discovery(self):
         for device in self._device_list:
@@ -256,6 +250,21 @@ class Wallpad:
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
+            
+    def process_command_queue(self):
+        while True:
+            if not self.command_queue.empty():
+                msg = self.command_queue.get()  # 큐에서 명령을 가져와 처리
+                with self.lock:  # 락을 사용하여 한 번에 하나의 명령만 처리
+                    topic_split = msg.topic.split('/')
+                    try:
+                        device = self.get_device(device_name=topic_split[2])
+                        payload = device.get_command_payload(topic_split[3], msg.payload.decode())
+                        self.mqtt_client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+                    except ValueError as e:
+                        print(e)
+                        self.mqtt_client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
+            time.sleep(0.1)  # 잠시 대기 후 큐에서 또 명령을 확인
             
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
