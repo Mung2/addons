@@ -7,6 +7,7 @@ import json
 from threading import Lock
 
 seq_t_dic = {'c':1, 'd':2, 'e':3, 'f':4}
+ack_data = []
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
