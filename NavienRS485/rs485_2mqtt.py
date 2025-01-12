@@ -145,9 +145,7 @@ class Wallpad:
         self.mqtt_client.username_pw_set(username=MQTT_USERNAME, password=MQTT_PASSWORD)
         self.mqtt_client.connect(MQTT_SERVER, 1883)
         self._device_list = []
-        # lock 객체 초기화
-        self.send_lock = Lock()
-
+        
     def listen(self):
         self.register_mqtt_discovery()
         for topic_list in [(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()]:
