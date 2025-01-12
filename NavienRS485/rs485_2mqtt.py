@@ -225,39 +225,63 @@ class Wallpad:
                     continue
             except Exception:
                 client.publish(f"{ROOT_TOPIC_NAME}/dev/error", payload_hexstring, qos=1, retain=True)
-
+                
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
         try:
-            # 명령을 처리할 때, Lock을 획득합니다.
             with self.command_lock:
                 device = self.get_device(device_name=topic_split[2])
                 if len(device.child_devices) > 0:
                     payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
                 else:
                     payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-
-                # 명령 발송
+    
+                # 중복 명령 확인
+                if self.pending_command == payload:
+                    print(f"Duplicate command ignored: {payload}")
+                    return
+                
+                self.pending_command = payload
                 self._send_packet(client, payload)
-
+    
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
-            
+        
     def _send_packet(self, client, payload):
-        # 패킷 발송 (예시: client.publish)
-        print(f"Sending packet: {payload}")  # 디버깅용 출력
-        client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+        with self.command_lock:
+            self.packet_sent_time = time.time()
+            print(f"Sending packet: {payload}")  # 디버깅용 출력
+            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+            
+            # ACK 대기
+            ack_timeout = 3  # ACK 대기 시간
+            if not self._wait_for_ack(ack_timeout):
+                print("ACK not received, retrying...")
+                time.sleep(self.retry_wait_time)
+                self._send_packet(client, payload)  # 재전송
+            else:
+                print("ACK received successfully.")
+
+    def _wait_for_ack(self, timeout):
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self.packet_sent_time is None:  # ACK 수신 시 None으로 설정
+                return True
+            time.sleep(0.1)
+        return False
+        
+    def __init__(self):
+    # 중복 명령 방지용
+    self.pending_command = None
     
     def on_publish(self, client, userdata, mid):
-        # 발송된 메시지에 대한 ACK을 받았을 때 호출
         print(f"Message with mid {mid} has been acknowledged.")
-        # 메시지 발송 후 ACK 확인 후 재전송 하지 않음
         if self.packet_sent_time:
             ack_time = time.time()
-            if ack_time - self.packet_sent_time > self.retry_wait_time:
-                print(f"Acknowledgement received in {ack_time - self.packet_sent_time} seconds")
+            print(f"Acknowledgement received in {ack_time - self.packet_sent_time} seconds")
             self.packet_sent_time = None
+            self.pending_command = None  # ACK 수신 후 명령 초기화
             
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
