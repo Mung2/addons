@@ -273,7 +273,7 @@ class Wallpad:
         
     def __init__(self):
     # 중복 명령 방지용
-    self.pending_command = None
+        self.pending_command = None
     
     def on_publish(self, client, userdata, mid):
         print(f"Message with mid {mid} has been acknowledged.")
