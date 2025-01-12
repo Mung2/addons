@@ -6,6 +6,8 @@ from collections import defaultdict
 import json
 from threading import Lock
 
+seq_t_dic = {'c':1, 'd':2, 'e':3, 'f':4}
+
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
 MQTT_SERVER = '192.168.219.202'
