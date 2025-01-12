@@ -4,6 +4,10 @@ from json import dumps as json_dumps
 from functools import reduce
 from collections import defaultdict
 import json
+import threading
+from queue import Queue
+import time
+import random
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
@@ -145,13 +149,22 @@ class Wallpad:
         self.mqtt_client.username_pw_set(username=MQTT_USERNAME, password=MQTT_PASSWORD)
         self.mqtt_client.connect(MQTT_SERVER, 1883)
         self._device_list = []
+        self.lock = threading.Lock()  # 스레드 락
+        self.command_queue = Queue()  # 큐 설정
         
     def listen(self):
         self.register_mqtt_discovery()
         for topic_list in [(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()]:
             print(topic_list)
         self.mqtt_client.subscribe([(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()])
-        self.mqtt_client.loop_forever()
+        self.mqtt_client.loop_start() # 비동기식 MQTT 루프
+        
+        while True:
+            if not self.command_queue.empty():
+                msg = self.command_queue.get()  # 큐에서 명령을 가져와 처리
+                with self.lock:  # 락을 사용하여 한 번에 하나의 명령만 처리
+                    self._process_command_message(self.mqtt_client, msg)
+            time.sleep(0.1)  # 0.1초마다 큐를 체크
 
     def register_mqtt_discovery(self):
         for device in self._device_list:
@@ -221,8 +234,6 @@ class Wallpad:
 
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
-        # print(topic_split)
-        # print(msg.payload)
         try:            
             # 예외처리 - 전열교환기 pesentage가 0일 경우, 전원으로 치환
             if topic_split[2]=="전열교환기" and topic_split[3]=="percentage" and topic_split[4]=="set" and msg.payload==b'0':
@@ -234,9 +245,10 @@ class Wallpad:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode(),child_name=topic_split[2])
             else:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-                
-            # print(payload)
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+                         
+            # 명령을 큐에 추가 (동시성 문제 방지)
+            self.command_queue.put(msg)
+            
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
@@ -245,11 +257,8 @@ class Wallpad:
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
 
     def _publish_device_payload(self, client, payload_dict):
-        # print(payload_dict)
         device = self.get_device(device_id=payload_dict['device_id'], device_subid=payload_dict['device_subid'])
         for topic, value in device.parse_payload(payload_dict).items():
-            # print(topic)
-            # print(value)
             client.publish(topic, value, qos=1, retain=False)
 
     def on_disconnect(self, client, userdata, rc):
