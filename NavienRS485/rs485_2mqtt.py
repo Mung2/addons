@@ -8,6 +8,8 @@ from threading import Lock
 
 seq_t_dic = {'c':1, 'd':2, 'e':3, 'f':4}
 ack_data = []
+type_t_dic = {'30b':'send', '30d':'ack'}
+type_h_dic = {v: k for k, v in type_t_dic.items()}
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
