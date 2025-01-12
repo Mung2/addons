@@ -151,6 +151,8 @@ class Wallpad:
         self._device_list = []
         # 명령 큐 및 처리 스레드
         self.command_queue = queue.Queue()
+        self.pending_command = None  # 현재 처리 중인 명령
+        self.command_ack_received = threading.Event()  # ACK 수신 확인
         self.command_processor_thread = threading.Thread(target=self._process_command_queue, daemon=True)
         self.command_processor_thread.start()
         
@@ -210,10 +212,18 @@ class Wallpad:
     def on_raw_message(self, client, userdata, msg):
         if msg.topic == f"{ROOT_TOPIC_NAME}/dev/raw":
             self._process_raw_message(client, msg)
+        elif msg.topic == f"{ROOT_TOPIC_NAME}/dev/ack":  # ACK 처리
+            self._process_ack_message(msg)
+            
+    def _process_ack_message(self, msg):
+        # ACK 메시지가 현재 명령에 대한 것인지 확인
+        ack_payload = msg.payload.decode()
+        if ack_payload == self.pending_command:
+            print(f"ACK received for command: {ack_payload}")
+            self.command_ack_received.set()  # ACK 수신 플래그 설정
         else:
-            print(msg.topic)    
-            self._process_command_message(client, msg)
-
+            print(f"Unexpected ACK received: {ack_payload}")
+            
     def _process_raw_message(self, client, msg):
         for payload_raw_bytes in msg.payload.split(b'\xf7')[1:]:
             payload_hexstring = 'f7' + payload_raw_bytes.hex()
@@ -228,14 +238,22 @@ class Wallpad:
                 
     def _process_command_queue(self):
         while True:
-            # 큐에서 명령을 하나씩 가져와 처리
             client, payload = self.command_queue.get()
-            try:
-                self._send_packet(client, payload)
-            except Exception as e:
-                print(f"Error processing command: {e}")
-            finally:
-                self.command_queue.task_done()
+            self.pending_command = payload
+            self.command_ack_received.clear()  # ACK 상태 초기화
+
+            # 명령 전송
+            self._send_packet(client, payload)
+
+            # ACK 대기
+            ack_timeout = 3  # ACK 대기 시간 (초)
+            if not self.command_ack_received.wait(ack_timeout):
+                print(f"ACK not received for command: {payload}. Retrying...")
+                self._send_packet(client, payload)  # 재전송
+
+            # 작업 완료
+            self.command_queue.task_done()
+            self.pending_command = None
 
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
@@ -245,7 +263,7 @@ class Wallpad:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
             else:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-            
+
             # 명령을 큐에 추가
             self.command_queue.put((client, payload))
 
@@ -254,10 +272,8 @@ class Wallpad:
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
 
     def _send_packet(self, client, payload):
-        # 패킷 발송 (예시: client.publish)
         print(f"Sending packet: {payload}")
         client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-        time.sleep(0.5)  # 네트워크 안정성을 위해 약간의 대기 추가
             
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
