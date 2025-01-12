@@ -4,6 +4,7 @@ from json import dumps as json_dumps
 from functools import reduce
 from collections import defaultdict
 import json
+from threading import Lock
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
@@ -145,6 +146,8 @@ class Wallpad:
         self.mqtt_client.username_pw_set(username=MQTT_USERNAME, password=MQTT_PASSWORD)
         self.mqtt_client.connect(MQTT_SERVER, 1883)
         self._device_list = []
+        # lock 객체 초기화
+        self.send_lock = Lock()
 
     def listen(self):
         self.register_mqtt_discovery()
@@ -219,37 +222,54 @@ class Wallpad:
                 client.publish(f"{ROOT_TOPIC_NAME}/dev/error", payload_hexstring, qos=1, retain=True)
 
     def _process_command_message(self, client, msg):
-        topic_split = msg.topic.split('/')
-        # print(topic_split)
-        # print(msg.payload)
-        try:            
-            # 예외처리 - 전열교환기 pesentage가 0일 경우, 전원으로 치환
-            if topic_split[2]=="전열교환기" and topic_split[3]=="percentage" and topic_split[4]=="set" and msg.payload==b'0':
-                topic_split[3]="power"
-                msg.payload = b'OFF'
-            
-            device = self.get_device(device_name=topic_split[2])
-            if len(device.child_devices)>0:
-                payload = device.get_command_payload(topic_split[3], msg.payload.decode(),child_name=topic_split[2])
-            else:
-                payload = device.get_command_payload(topic_split[3], msg.payload.decode())
+        with self.send_lock:
+            topic_split = msg.topic.split('/')
+            try:
+                device = self.get_device(device_name=topic_split[2])
+                if len(device.child_devices) > 0:
+                    payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
+                else:
+                    payload = device.get_command_payload(topic_split[3], msg.payload.decode())
                 
-            # print(payload)
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-        except ValueError as e:
-            print(e)
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
+                # ACK 대기 및 재전송 로직
+                ack_received = False
+                for seq_h in seq_t_dic.keys():
+                    ack_data.append(type_h_dic['ack'] + seq_h + '00' + src + dest + cmd + value)
+                    try:
+                        ack_q.get(True, 1.3 + 0.2 * random.random())  # random wait for ACK
+                        ack_received = True
+                        break
+                    except queue.Empty:
+                        # ACK를 받지 못하면 재전송
+                        logging.info(f"[ACK] No ACK received, retrying...")
+                        time.sleep(1.3 + 0.2 * random.random())  # 랜덤 대기 후 재시도
+                        continue
+                
+                if ack_received:
+                    client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+                else:
+                    logging.error("[RS485] No ACK received, giving up on command.")
+                    client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: No ACK for {msg.topic}", qos=1, retain=True)
+
+            except ValueError as e:
+                logging.error(e)
+                client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
 
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
 
     def _publish_device_payload(self, client, payload_dict):
-        # print(payload_dict)
+        # 패킷 전송 전, 시간 차이를 확인하여 대기 시간을 조정합니다.
+        last_send_time = getattr(self, 'last_send_time', 0)
+        time_gap = time.time() - last_send_time
+        if time_gap < 0.5:  # 0.5초 이상 간격 두기
+            time.sleep(0.5 - time_gap)
+        # 이후 실제 패킷 전송
         device = self.get_device(device_id=payload_dict['device_id'], device_subid=payload_dict['device_subid'])
         for topic, value in device.parse_payload(payload_dict).items():
-            # print(topic)
-            # print(value)
             client.publish(topic, value, qos=1, retain=False)
+        # 전송 후, 마지막 전송 시간을 기록
+        self.last_send_time = time.time()
 
     def on_disconnect(self, client, userdata, rc):
         raise ConnectionError
