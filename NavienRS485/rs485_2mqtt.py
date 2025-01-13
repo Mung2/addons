@@ -238,7 +238,7 @@ class Wallpad:
                 
             # print(payload)
             info = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            info.wait_for_publish()  # 메시지가 처리될 때까지 대기q
+            info.wait_for_publish()  # 메시지가 처리될 때까지 대기기
             time.sleep(1)
             info = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
             info.wait_for_publish()
