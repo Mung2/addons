@@ -237,9 +237,11 @@ class Wallpad:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
                 
             # print(payload)
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            #time.sleep(1)  # 1000ms 대기
-            #client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+            info = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+            info.wait_for_publish()  # 메시지가 처리될 때까지 대기
+            time.sleep(1)
+            info = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+            info.wait_for_publish()
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
