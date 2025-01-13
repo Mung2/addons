@@ -238,7 +238,7 @@ class Wallpad:
                 
             # print(payload)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            time.sleep(0.5)  # 500ms 대기
+            time.sleep(1)  # 1000ms 대기
             client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
         except ValueError as e:
             print(e)
