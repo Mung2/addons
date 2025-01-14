@@ -237,12 +237,12 @@ class Wallpad:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
                 
             # 새로운 함수로 전송 작업 위임
-            send_command_with_retry(client, f"{ROOT_TOPIC_NAME}/dev/command", payload)
+            send_command_with_retry(client, payload)
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
 
-    def send_command_with_retry(client, interval=1):
+    def send_command_with_retry(client, payload, interval=1):
         # 첫 번째 명령 전송
         client.publish(client, f"{ROOT_TOPIC_NAME}/dev/command", qos=2, retain=False)
         time.sleep(interval)  # 간격 대기
