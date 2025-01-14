@@ -237,11 +237,13 @@ class Wallpad:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
                 
             # print(payload)
+            client.loop_start()  # 이벤트 루프 시작
+
             client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            client.loop_write()  # 메시지를 즉시 처리
-            time.sleep(1)
+            time.sleep(1)  # 1초 대기
             client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            client.loop_write()
+
+            client.loop_stop()  # 이벤트 루프 종료
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
