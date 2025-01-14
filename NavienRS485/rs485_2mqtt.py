@@ -220,7 +220,7 @@ class Wallpad:
             except Exception:
                 client.publish(f"{ROOT_TOPIC_NAME}/dev/error", payload_hexstring, qos=1, retain=True)
 
-    def _process_command_message(self, client, msg):
+    def _process_command_message(self, client, msg, interval=1):
         topic_split = msg.topic.split('/')
         # print(topic_split)
         # print(msg.payload)
@@ -236,18 +236,12 @@ class Wallpad:
             else:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
                 
-            # 새로운 함수로 전송 작업 위임
-            send_command_with_retry(client, payload)
+            client.publish(client, f"{ROOT_TOPIC_NAME}/dev/command", qos=2, retain=False)
+            time.sleep(interval)
+            client.publish(client, f"{ROOT_TOPIC_NAME}/dev/command", qos=2, retain=False)
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
-
-    def send_command_with_retry(client, payload, interval=1):
-        # 첫 번째 명령 전송
-        client.publish(client, f"{ROOT_TOPIC_NAME}/dev/command", qos=2, retain=False)
-        time.sleep(interval)  # 간격 대기
-        # 두 번째 명령 전송
-        client.publish(client, f"{ROOT_TOPIC_NAME}/dev/command", qos=2, retain=False)
         
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
