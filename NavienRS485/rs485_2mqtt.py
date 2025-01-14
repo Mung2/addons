@@ -242,12 +242,12 @@ class Wallpad:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
 
-    def send_command_with_retry(client, topic, payload, interval=1):
+    def send_command_with_retry(client, interval=1):
         # 첫 번째 명령 전송
-        client.publish(topic, payload, qos=2, retain=False)
+        client.publish(client, f"{ROOT_TOPIC_NAME}/dev/command", qos=2, retain=False)
         time.sleep(interval)  # 간격 대기
         # 두 번째 명령 전송
-        client.publish(topic, payload, qos=2, retain=False)
+        client.publish(client, f"{ROOT_TOPIC_NAME}/dev/command", qos=2, retain=False)
         
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
