@@ -237,11 +237,13 @@ class Wallpad:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
                 
             # print(payload)
-            info = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            info.wait_for_publish()  # 메시지가 처리될 때까지 대기기
-            time.sleep(1)
-            info = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            info.wait_for_publish()
+        client.loop_start()  # 이벤트 루프 시작
+        info = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+        info.wait_for_publish()  # 첫 번째 메시지가 큐에 들어가는 것을 확인
+        time.sleep(1)  # 1초 대기
+        info = client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+        info.wait_for_publish()  # 두 번째 메시지가 큐에 들어가는 것을 확인
+        client.loop_stop()  # 이벤트 루프 중지
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
