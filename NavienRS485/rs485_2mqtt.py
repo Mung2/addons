@@ -241,7 +241,7 @@ class Wallpad:
             client.loop_write()  # 메시지를 즉시 처리
             time.sleep(1)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            client.loop_write()지
+            client.loop_write()
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
