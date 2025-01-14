@@ -220,7 +220,7 @@ class Wallpad:
             except Exception:
                 client.publish(f"{ROOT_TOPIC_NAME}/dev/error", payload_hexstring, qos=1, retain=True)
 
-    def _process_command_message(self, client, msg, interval=1):
+    def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
         # print(topic_split)
         # print(msg.payload)
@@ -237,8 +237,7 @@ class Wallpad:
                 payload = device.get_command_payload(topic_split[3], msg.payload.decode())
                 
             client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
-            time.sleep(interval)
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
