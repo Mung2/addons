@@ -317,36 +317,9 @@ for message_flag in ['81', '01', ]:
     # 추가적인 상태 등록 (away_mode, targettemp 등)
     난방.register_status(message_flag=message_flag, attr_name='away_mode', topic_class='away_mode_state_topic', regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}', process_func=lambda v: 'ON' if v != 0 else 'OFF')
 
-# 온도 관련 상태 등록
-rooms = {
-    "거실": 0,
-    "안방": 1,
-    "끝방": 2,
-    "중간방": 3
-}
-
-for message_flag in ['81', '01']:
-    for room, index in rooms.items():
-        # 현재 온도 등록
-        난방.register_status(
-            message_flag=message_flag,
-            attr_name=f'{room}_currenttemp',
-            topic_class='current_temperature_topic',
-            regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{8})',
-            process_func=lambda v, i=index: int(v[i*2:i*2+2], 16) % 128 + int(v[i*2:i*2+2], 16) // 128 * 0.5
-        )
-
-        # 목표 온도 등록
-        난방.register_status(
-            message_flag=message_flag,
-            attr_name=f'{room}_targettemp',
-            topic_class='temperature_state_topic',
-            regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{10})',
-            process_func=lambda v, i=index: int(v[i*2:i*2+2], 16) % 128 + int(v[i*2:i*2+2], 16) // 128 * 0.5
-        )
-
-    # 난방온도 설정 커맨드
-    난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v == 'heat' else '00')
+    # 온도 관련 상태 등록
+    난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic', regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})', process_func=lambda v: [int(x, 16) % 128 + int(x, 16) // 128 * 0.5 for x in v]
+    난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic', regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}', process_func=lambda v: [int(x, 16) % 128 + int(x, 16) // 128 * 0.5 for x in v]
     난방.register_command(message_flag='44', attr_name='targettemp', topic_class='temperature_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x'))
     난방.register_command(message_flag='45', attr_name='away_mode', topic_class='away_mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v =='ON' else '00')
 
