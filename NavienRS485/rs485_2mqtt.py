@@ -317,14 +317,27 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
+last_logged_time = 0
+log_interval = 5  # 5초 간격으로 로그를 출력
+
 def process_currenttemp(v):
+    global last_logged_time
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
+    current_time = time.time()
+    # 5초마다 로그 출력
+    if current_time - last_logged_time >= log_interval:
+       logging.debug(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
+       last_logged_time = current_time
     return temp
 
 def process_targettemp(v):
+    global last_logged_time
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
+    current_time = time.time()
+    # 5초마다 로그 출력
+    if current_time - last_logged_time >= log_interval:
+       logging.debug(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
+       last_logged_time = current_time
     return temp
 
 for message_flag in ['81', '01']:
@@ -336,15 +349,15 @@ for message_flag in ['81', '01']:
                          regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
                          process_func=lambda v: 'ON' if v != 0 else 'OFF')
 
-    # 여기 두 줄만 바뀐 거야
+    # 현재 온도
     난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic',
                          regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',
                          process_func=process_currenttemp)
-
+    # 설정 온도
     난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic',
                          regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}',
                          process_func=process_targettemp)
-
+    # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
                           controll_id=['11', '12', '13', '14'],
                           process_func=lambda v: '01' if v == 'heat' else '00')
