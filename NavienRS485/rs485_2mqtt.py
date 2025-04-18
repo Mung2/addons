@@ -6,6 +6,17 @@ from collections import defaultdict
 import json
 import threading
 import time
+import logging
+
+# 로그 포맷 설정: 시간, 로그 레벨, 메시지
+logging.basicConfig(
+    format='%(asctime)s - %(message)s',
+    level=logging.DEBUG
+)
+
+# 기존 디버그를 logging으로 변경
+logging.debug(f"currenttemp - raw value: {raw_value}, parsed temp: {parsed_temp}")
+
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
