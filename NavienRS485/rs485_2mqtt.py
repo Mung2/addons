@@ -50,6 +50,9 @@ class Device:
             parse_status = re.match(status['regex'], payload_dict['data'])
             # print(status['regex'], payload_dict['data'])
             # print(parse_status)
+            
+            groups = parse_status.groups()
+            
             if len(self.child_devices)>0:
                 for index, child_device in enumerate(self.child_devices):
                     topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
