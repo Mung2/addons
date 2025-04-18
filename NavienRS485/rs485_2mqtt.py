@@ -64,7 +64,7 @@ class Device:
                     
             else:
                 topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{self.device_name}/{status['attr_name']}"    
-                result[topic] = status['process_func'](parse_status.(groups)
+                result[topic] = status['process_func'](groups)
                 # print(result[topic])
         return result
 
