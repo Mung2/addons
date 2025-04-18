@@ -317,15 +317,35 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
+def process_packet(v):
+    logging.debug(f"[DEBUG] raw packet: {v}")  # 들어오는 원본 패킷을 디버그로 출력
+    return v
+
 def process_currenttemp(v):
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
+    logging.debug(f"[DEBUG] currenttemp - raw packet: {v}, parsed temp: {temp}")
     return temp
+
+def process_currenttemps(values):
+    # 값들을 한 번에 처리하여 출력
+    parsed_temps = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in values]
+    temp_str = ', '.join([f"{temp:.1f}" for temp in parsed_temps])
+    logging.debug(f"[DEBUG] currenttemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
+    return parsed_temps
 
 def process_targettemp(v):
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
+    logging.debug(f"[DEBUG] targettemp - raw packet: {v}, parsed temp: {temp}")
     return temp
+
+def process_targettemps(values):
+    # 값들을 한 번에 처리하여 출력
+    parsed_temps = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in values]
+    temp_str = ', '.join([f"{temp:.1f}" for temp in parsed_temps])
+    logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
+    return parsed_temps
+
+
 
 for message_flag in ['81', '01']:
     난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
