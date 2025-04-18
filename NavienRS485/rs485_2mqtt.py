@@ -310,71 +310,45 @@ optional_info = {'optimistic': 'false'}
 optional_info = {'modes': ['off', 'heat',], 'temp_step': 0.5, 'precision': 0.5, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
 난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices = ["거실", "안방", "끝방","중간방"], device_class='climate', optional_info=optional_info)
 
+def process_currenttemp(v):
+    temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
+    print(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
+    return temp
+
+def process_targettemp(v):
+    temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
+    print(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
+    return temp
+
 for message_flag in ['81', '01']:
-    # 0007000000141619191619
-    난방.register_status(
-        message_flag=message_flag,
-        attr_name='power',
-        topic_class='mode_state_topic',
-        regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}',
-        process_func=lambda v: 'heat' if v != 0 else 'off'
-    )
+    난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
+                         regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}',
+                         process_func=lambda v: 'heat' if v != 0 else 'off')
 
-    # 추가적인 상태 등록 (away_mode)
-    난방.register_status(
-        message_flag=message_flag,
-        attr_name='away_mode',
-        topic_class='away_mode_state_topic',
-        regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
-        process_func=lambda v: 'ON' if v != 0 else 'OFF'
-    )
+    난방.register_status(message_flag=message_flag, attr_name='away_mode', topic_class='away_mode_state_topic',
+                         regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
+                         process_func=lambda v: 'ON' if v != 0 else 'OFF')
 
-    # 현재온도 상태 등록 (디버그 추가)
-    난방.register_status(
-        message_flag=message_flag,
-        attr_name='currenttemp',
-        topic_class='current_temperature_topic',
-        regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',
-        process_func=lambda v: (
-            print(f"[DEBUG] currenttemp - raw values: {v}") or
-            int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-        )
-    )
+    # 여기 두 줄만 바뀐 거야
+    난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic',
+                         regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',
+                         process_func=process_currenttemp)
 
-    # 희망온도 상태 등록 (디버그 추가)
-    난방.register_status(
-        message_flag=message_flag,
-        attr_name='targettemp',
-        topic_class='temperature_state_topic',
-        regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}',
-        process_func=lambda v: (
-            print(f"[DEBUG] targettemp - raw values: {v}") or
-            int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-        )
-    )
+    난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic',
+                         regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}',
+                         process_func=process_targettemp)
 
-    # 명령 등록
-    난방.register_command(
-        message_flag='43',
-        attr_name='power',
-        topic_class='mode_command_topic',
-        controll_id=['11','12','13','14'],
-        process_func=lambda v: '01' if v == 'heat' else '00'
-    )
-    난방.register_command(
-        message_flag='44',
-        attr_name='targettemp',
-        topic_class='temperature_command_topic',
-        controll_id=['11','12','13','14'],
-        process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x')
-    )
-    난방.register_command(
-        message_flag='45',
-        attr_name='away_mode',
-        topic_class='away_mode_command_topic',
-        controll_id=['11','12','13','14'],
-        process_func=lambda v: '01' if v == 'ON' else '00'
-    )
+    난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
+                          controll_id=['11', '12', '13', '14'],
+                          process_func=lambda v: '01' if v == 'heat' else '00')
+
+    난방.register_command(message_flag='44', attr_name='targettemp', topic_class='temperature_command_topic',
+                          controll_id=['11', '12', '13', '14'],
+                          process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x'))
+
+    난방.register_command(message_flag='45', attr_name='away_mode', topic_class='away_mode_command_topic',
+                          controll_id=['11', '12', '13', '14'],
+                          process_func=lambda v: '01' if v == 'ON' else '00')
 
 
 wallpad.listen()
