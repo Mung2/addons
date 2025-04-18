@@ -44,28 +44,27 @@ class Device:
             'controll_id': controll_id
         }
 
-   def parse_payload(self, payload_dict):
-      result = {}
-      for status in self.status_messages[payload_dict['message_flag']]:
-          parse_status = re.match(status['regex'], payload_dict['data'])
-          if not parse_status:
-              continue
+    def parse_payload(self, payload_dict):
+        result = {}
+        for status in self.status_messages[payload_dict['message_flag']]:
+            parse_status = re.match(status['regex'], payload_dict['data'])
+            if not parse_status:
+                continue
 
-          groups = parse_status.groups()
+            groups = parse_status.groups()
 
-          if len(self.child_devices) > 0:
-              for index, child_device in enumerate(self.child_devices):
-                  topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
+            if len(self.child_devices) > 0:
+                for index, child_device in enumerate(self.child_devices):
+                    topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
 
-                  if (status['attr_name'] in ("power", "away_mode")) and self.device_class == "climate":
-                      result[topic] = status['process_func'](int(groups[0], 16) & (1 << index))
-                  else:
-                      result[topic] = status['process_func'](groups[index])
-          else:
-              topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{self.device_name}/{status['attr_name']}"
-              result[topic] = status['process_func'](groups)  # ✅ 핵심 수정
-      return result
-
+                    if (status['attr_name'] in ("power", "away_mode")) and self.device_class == "climate":
+                        result[topic] = status['process_func'](int(groups[0], 16) & (1 << index))
+                    else:
+                        result[topic] = status['process_func'](groups[index])
+            else:
+                topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{self.device_name}/{status['attr_name']}"
+                result[topic] = status['process_func'](groups[0])
+        return result
 
     def get_command_payload(self, attr_name, attr_value, child_name=None):
         # print(self.device_name, self.device_subid, attr_value)
