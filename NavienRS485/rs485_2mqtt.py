@@ -317,14 +317,14 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-def process_currenttemp(v, raw_packet):
+def process_currenttemp(v):
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] currenttemp - raw packet: {raw_packet}, raw value: {v}, parsed temp: {temp}")
+    logging.debug(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
     return temp
 
-def process_targettemp(v, raw_packet):
+def process_targettemp(v):
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] targettemp - raw packet: {raw_packet}, raw value: {v}, parsed temp: {temp}")
+    logging.debug(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
     return temp
 
 for message_flag in ['81', '01']:
@@ -339,11 +339,11 @@ for message_flag in ['81', '01']:
     # 현재 온도
     난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic',
                          regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',
-                         process_func=lambda v, packet: process_currenttemp(v, raw_packet))
+                         process_func=process_targettemp
     # 설정 온도
     난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic',
                          regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}',
-                         process_func=lambda v, packet: process_currenttemp(v, raw_packet))
+                         process_func=process_targettemp
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
                           controll_id=['11', '12', '13', '14'],
