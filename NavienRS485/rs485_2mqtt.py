@@ -360,7 +360,7 @@ for message_flag in ['81', '01']:
     # 현재 온도
     난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic',
                          regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',
-                         process_func=process_targettemp)
+                         process_func=process_currenttemp)
     # 설정 온도
     난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic',
                          regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}',
