@@ -319,12 +319,12 @@ logging.basicConfig(
 
 def process_currenttemp(v):
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
+    logging.debug(f"[DEBUG] currenttemp - raw packet: {raw_packet}, raw value: {v}, parsed temp: {temp}")
     return temp
 
 def process_targettemp(v):
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
+    logging.debug(f"[DEBUG] targettemp - raw packet: {raw_packet}, raw value: {v}, parsed temp: {temp}")
     return temp
 
 for message_flag in ['81', '01']:
