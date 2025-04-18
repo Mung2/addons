@@ -333,17 +333,17 @@ def process_currenttemps(values):
     logging.debug(f"[DEBUG] currenttemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
     return parsed_temps
 
-#def process_targettemp(v):
-   # temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-  #  logging.debug(f"[DEBUG] targettemp - raw packet: {v}, parsed temp: {temp}")
- #   return temp
+def process_targettemp(v):
+    temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
+    logging.debug(f"[DEBUG] targettemp - raw packet: {v}, parsed temp: {temp}")
+    return temp
 
-#def process_targettemps(values):
+def process_targettemps(values):
     # 값들을 한 번에 처리하여 출력
-   # parsed_temps = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in values]
-  #  temp_str = ', '.join([f"{temp:.1f}" for temp in parsed_temps])
- #   logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
-#    return parsed_temps
+    parsed_temps = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in values]
+    temp_str = ', '.join([f"{temp:.1f}" for temp in parsed_temps])
+    logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
+    return parsed_temps
 
 
 
