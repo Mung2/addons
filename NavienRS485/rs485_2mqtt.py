@@ -8,16 +8,6 @@ import threading
 import time
 import logging
 
-# 로그 포맷 설정: 시간, 로그 레벨, 메시지
-logging.basicConfig(
-    format='%(asctime)s - %(message)s',
-    level=logging.DEBUG
-)
-
-# 기존 디버그를 logging으로 변경
-logging.debug(f"currenttemp - raw value: {raw_value}, parsed temp: {parsed_temp}")
-
-
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
 MQTT_SERVER = '192.168.219.202'
@@ -321,14 +311,20 @@ optional_info = {'optimistic': 'false'}
 optional_info = {'modes': ['off', 'heat',], 'temp_step': 0.5, 'precision': 0.5, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
 난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices = ["거실", "안방", "끝방","중간방"], device_class='climate', optional_info=optional_info)
 
+# 로그 포맷 설정
+logging.basicConfig(
+    format='%(asctime)s - %(message)s',
+    level=logging.DEBUG
+)
+
 def process_currenttemp(v):
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    print(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
+    logging.debug(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
     return temp
 
 def process_targettemp(v):
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    print(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
+    logging.debug(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
     return temp
 
 for message_flag in ['81', '01']:
