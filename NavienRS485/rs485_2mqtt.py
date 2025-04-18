@@ -317,27 +317,16 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-last_logged_time = 0
-log_interval = 10  # 10초 간격으로 로그를 출력
-
 def process_currenttemp(v):
-    global last_logged_time
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    current_time = time.time()
-    # 10초마다 로그 출력
-    if current_time - last_logged_time >= log_interval:
-       logging.debug(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
-       last_logged_time = current_time
+    logging.debug(f"[DEBUG] currenttemp - raw value: {v}, parsed temp: {temp}")
+    last_logged_time = current_time
     return temp
 
 def process_targettemp(v):
-    global last_logged_time
     temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    current_time = time.time()
-    # 10초마다 로그 출력
-    if current_time - last_logged_time >= log_interval:
-       logging.debug(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
-       last_logged_time = current_time
+    logging.debug(f"[DEBUG] targettemp - raw value: {v}, parsed temp: {temp}")
+    last_logged_time = current_time
     return temp
 
 for message_flag in ['81', '01']:
