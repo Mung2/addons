@@ -317,11 +317,40 @@ for message_flag in ['81', '01', ]:
     # 추가적인 상태 등록 (away_mode, targettemp 등)
     난방.register_status(message_flag=message_flag, attr_name='away_mode', topic_class='away_mode_state_topic', regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}', process_func=lambda v: 'ON' if v != 0 else 'OFF')
 
-    # 온도 관련 상태 등록
-    난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic', regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})', process_func=lambda v: int(x, 16) % 128 + int(x, 16) // 128 * 0.5 for x in v
+# 온도 관련 상태 등록
+난방.register_status(
+    message_flag=message_flag,
+    attr_name='currenttemp',
+    topic_class='current_temperature_topic',
+    regex=r'00[0-9a-fA-F]{6}'                  # 앞에 불필요한 6자리 스킵
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 거실 (2바이트)
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 안방
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 끝방
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})', # 중간방
+    process_func=lambda v: {
+        "거실": int(v[0], 16) + int(v[1], 16) / 256,
+        "안방": int(v[2], 16) + int(v[3], 16) / 256,
+        "끝방": int(v[4], 16) + int(v[5], 16) / 256,
+        "중간방": int(v[6], 16) + int(v[7], 16) / 256,
+    }
+)
 
-    난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic', regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}', process_func=lambda v: int(x, 16) % 128 + int(x, 16) // 128 * 0.5 for x in v
-    
+난방.register_status(
+    message_flag=message_flag,
+    attr_name='targettemp',
+    topic_class='temperature_state_topic',
+    regex=r'00[0-9a-fA-F]{6}'                  # 앞부분 스킵
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 거실
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 안방
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 끝방
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})', # 중간방
+    process_func=lambda v: {
+        "거실": int(v[0], 16) + int(v[1], 16) / 256,
+        "안방": int(v[2], 16) + int(v[3], 16) / 256,
+        "끝방": int(v[4], 16) + int(v[5], 16) / 256,
+        "중간방": int(v[6], 16) + int(v[7], 16) / 256,
+    }
+)
                       
     # 난방온도 설정 커맨드
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v == 'heat' else '00')
