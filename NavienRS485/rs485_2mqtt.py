@@ -344,44 +344,13 @@ def process_alltemps(values):
     logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
     logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
     
-    result = {}
-    for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
-        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
+    # 상태값 직접 반영
+    for index, room in enumerate(['거실', '안방', '끝방', '중간방']):
+        난방.set_status(room, 'currenttemp', parsed_currenttemps[index])
+        난방.set_status(room, 'targettemp', parsed_targettemps[index])
 
-    return result
-
-def process_packet(v):
-    logging.debug(f"[DEBUG] raw packet: {v}")  # 들어오는 원본 패킷을 디버그로 출력
-    return v
-
-def process_currenttemp(v):
-    temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] currenttemp - raw packet: {v}, parsed temp: {temp}")
-    return temp
-
-def process_currenttemps(value):
-    # value는 8바이트 (16자리 문자열): '1497141713171417'
-    values = [value[i:i+2] for i in range(0, len(value), 2)]
-    parsed_temps = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in values]
-    temp_str = ', '.join([f"{temp:.1f}" for temp in parsed_temps])
-    logging.debug(f"[DEBUG] currenttemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
-    return parsed_temps
-
-def process_targettemp(v):
-    # 각 바이트를 합쳐서 온도 계산
-    temp = [int(val, 16) for val in v]
-    final_temp = (temp[0] + temp[1] * 256) / 2  # 예시: 온도값을 계산하는 방식
-    logging.debug(f"[DEBUG] targettemp - raw packet: {v}, parsed temp: {final_temp}")
-    return final_temp
-
-def process_targettemps(value):
-    # value는 8바이트 (16자리 문자열): '1497141713171417'
-    values = [value[i:i+2] for i in range(0, len(value), 2)]
-    parsed_temps = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in values]
-    temp_str = ', '.join([f"{temp:.1f}" for temp in parsed_temps])
-    logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
-    return parsed_temps
+    # MQTT publish는 하지 않으므로 빈 dict 반환
+    return {}
 
 for message_flag in ['81', '01']:
     난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
