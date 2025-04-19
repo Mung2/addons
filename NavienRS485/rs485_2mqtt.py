@@ -322,7 +322,6 @@ logging.basicConfig(
 )
 
 def process_alltemps(values):
-    # values: 총 8개 그룹 - [설정1, 현재1, 설정2, 현재2, 설정3, 현재3, 설정4, 현재4]
     if len(values) != 8:
         logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
         return {}
@@ -331,23 +330,23 @@ def process_alltemps(values):
     parsed_currenttemps = []
 
     for i in range(0, 8, 2):
-        target = int(values[i], 16) % 128 + int(values[i], 16) // 128 * 0.5
-        current = int(values[i+1], 16) % 128 + int(values[i+1], 16) // 128 * 0.5
-        parsed_targettemps.append(target)
-        parsed_currenttemps.append(current)
+        t = int(values[i], 16)
+        c = int(values[i + 1], 16)
+
+        target_temp = t % 128 + t // 128 * 0.5
+        current_temp = c % 128 + c // 128 * 0.5
+
+        parsed_targettemps.append(target_temp)
+        parsed_currenttemps.append(current_temp)
 
     logging.debug(f"[DEBUG] alltemps - raw packets: {', '.join(values)}")
     logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
     logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
 
     result = {}
-
     for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-        target_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"
-        current_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"
-
-        result[target_topic] = parsed_targettemps[index]
-        result[current_topic] = parsed_currenttemps[index]
+        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
+        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
 
     return result
 
@@ -397,14 +396,18 @@ for message_flag in ['81', '01']:
         message_flag=message_flag,
         attr_name='alltemps',
         topic_class=None,  # MQTT publish 안 하므로 None
-        regex=r'00[0-9a-fA-F]{10}'                # 버리는 10자리
-              r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 거실
-              r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 안방
-              r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 끝방
-              r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})', # 중간방
+        regex = (
+            r'00[0-9a-fA-F]{4}'              # 0D 00 (상태 바이트), 0F (ID), 00
+            r'([0-9a-fA-F]{2})'              # T1
+            r'([0-9a-fA-F]{2})'              # C1
+            r'([0-9a-fA-F]{2})'              # T2
+            r'([0-9a-fA-F]{2})'              # C2
+            r'([0-9a-fA-F]{2})'              # T3
+            r'([0-9a-fA-F]{2})'              # C3
+            r'([0-9a-fA-F]{2})'              # T4
+            r'([0-9a-fA-F]{2})',             # C4
         process_func=process_alltemps
     )
-
 
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
