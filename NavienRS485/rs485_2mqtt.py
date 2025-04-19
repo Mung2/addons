@@ -324,7 +324,7 @@ logging.basicConfig(
 def process_alltemps(values):
     if len(values) != 8:
         logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
-        return {}
+        return
 
     parsed_targettemps = []
     parsed_currenttemps = []
@@ -343,13 +343,7 @@ def process_alltemps(values):
     logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
     logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
     logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
-
-    result = {}
-    for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
-        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
-
-    return result
+    return
 
 for message_flag in ['81', '01']:
     난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
