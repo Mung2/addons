@@ -321,7 +321,7 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-def process_alltemps(values):
+def process_alltemps(values, mqtt_client):
     if len(values) != 8:
         logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
         return {}
@@ -357,8 +357,8 @@ def process_alltemps(values):
             result[topic_current] = value_current
 
             # ✅ 수동 publish 추가
-            mqtt.publish(topic_target, value_target)
-            mqtt.publish(topic_current, value_current)
+            mqtt_client.publish(topic_target, value_target)
+            mqtt_client.publish(topic_current, value_current)
 
         return result
 
