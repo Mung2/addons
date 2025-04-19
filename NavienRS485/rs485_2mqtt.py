@@ -67,7 +67,6 @@ class Device:
                     result[topic] = status['process_func'](int(groups[0], 16) & (1 << index))
                 else:
                     result[topic] = status['process_func'](groups[index])
-
         return result
 
     def get_command_payload(self, attr_name, attr_value, child_name=None):
