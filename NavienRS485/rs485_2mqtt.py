@@ -318,46 +318,6 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-def parse_payload(self, payload_dict):
-    result = {}
-    message_flag = payload_dict['message_flag']
-    data = payload_dict['data']
-
-    logging.debug(f"[DEBUG] parse_payload - flag: {message_flag}, data: {data}")
-    if message_flag not in self.status_messages:
-        logging.debug(f"[DEBUG] No matching status registered for flag: {message_flag}")
-        return result
-
-    for status in self.status_messages[message_flag]:
-        logging.debug(f"[DEBUG] Trying regex: {status['regex']}")
-        match = re.match(status['regex'], data)
-        if not match:
-            logging.debug("[DEBUG] Regex did not match.")
-            continue
-
-        groups = match.groups()
-        logging.debug(f"[DEBUG] Regex matched. Groups: {groups}")
-
-        if len(self.child_devices) > 0:
-            if len(groups) != len(self.child_devices):
-                logging.warning(f"[WARNING] Number of regex groups ({len(groups)}) does not match child devices ({len(self.child_devices)})")
-                continue
-
-            for index, child_device in enumerate(self.child_devices):
-                topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
-                logging.debug(f"[DEBUG] Publishing to topic: {topic}")
-                if (status['attr_name'] in ("power", "away_mode")) and self.device_class == "climate":
-                    result[topic] = status['process_func'](int(groups[0], 16) & (1 << index))
-                else:
-                    result[topic] = status['process_func'](groups[index])
-        else:
-            topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{self.device_name}/{status['attr_name']}"
-            logging.debug(f"[DEBUG] Publishing to topic: {topic}")
-            result[topic] = status['process_func'](groups)
-
-    logging.debug(f"[DEBUG] Final parsed result: {result}")
-    return result
-
 def process_packet(v):
     logging.debug(f"[DEBUG] raw packet: {v}")  # 들어오는 원본 패킷을 디버그로 출력
     return v
@@ -403,11 +363,11 @@ for message_flag in ['81', '01']:
 
     # 현재 온도
     난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic',
-                         regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{8})',
+                         regex=r'00[0-9a-fA-F]{6}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
                          process_func=process_currenttemps)
     # 설정 온도
     난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic',
-                         regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{8})',
+                         regex=r'00[0-9a-fA-F]{6}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
                          process_func=process_targettemps)
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
