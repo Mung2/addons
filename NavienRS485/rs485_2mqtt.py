@@ -335,17 +335,12 @@ def process_alltemps(values, mqtt_client):
         return {}
 
     try:
-        away_hex = values[0]
-        heat_hex = values[1]
-        temp_bytes = values[2:]
-
-        # 비트 reverse (LSB부터 적용하기 위해)
         away_bits = format(int(values[0], 16), '08b')[::-1]
         heat_bits = format(int(values[1], 16), '08b')[::-1]
 
         parsed_power = []
         for i in range(4):
-            bits = away_bits[i + 4] + heat_bits[i + 4]  # 뒤쪽 4비트만 사용
+            bits = away_bits[i + 4] + heat_bits[i + 4]  # 뒤쪽 4비트 사용
             if bits == '00':
                 parsed_power.append('off')
             elif bits == '01':
@@ -358,9 +353,9 @@ def process_alltemps(values, mqtt_client):
         parsed_targettemps = []
         parsed_currenttemps = []
 
-        for i in range(0, 8, 2):
-            t = int(temp_bytes[i], 16)
-            c = int(temp_bytes[i + 1], 16)
+        for i in range(2, 10, 2):
+            t = int(values[i], 16)
+            c = int(values[i + 1], 16)
             target_temp = t % 128 + t // 128 * 0.5
             current_temp = c % 128 + c // 128 * 0.5
             parsed_targettemps.append(target_temp)
@@ -368,28 +363,27 @@ def process_alltemps(values, mqtt_client):
 
         logging.debug("----------------------------------------------------------------------------------")
         logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
-        logging.debug(f"[DEBUG] parsed power: {power_states}")
+        logging.debug(f"[DEBUG] parsed power: {parsed_power}")
         logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
         logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
 
         result = {}
         for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
             base_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방"
-
             result[f"{base_topic}/targettemp"] = parsed_targettemps[index]
             result[f"{base_topic}/currenttemp"] = parsed_currenttemps[index]
-            result[f"{base_topic}/power"] = power_states[index]
+            result[f"{base_topic}/power"] = parsed_power[index]
 
             mqtt_client.publish(f"{base_topic}/targettemp", parsed_targettemps[index])
             mqtt_client.publish(f"{base_topic}/currenttemp", parsed_currenttemps[index])
-            mqtt_client.publish(f"{base_topic}/power", power_states[index])
+            mqtt_client.publish(f"{base_topic}/power", parsed_power[index])
 
         return result
 
     except Exception as e:
         logging.error(f"[ERROR] Failed to process alltemps: {e}")
         return {}
-
+        
 for message_flag in ['81', '01']:
 
     난방.register_status(
