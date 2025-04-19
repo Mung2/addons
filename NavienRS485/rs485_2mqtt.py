@@ -377,9 +377,6 @@ for message_flag in ['81', '01']:
         process_func=process_alltemps
     )
 
-room_names = ["거실", "안방", "끝방", "중간방"]
-
-for idx, room in enumerate(room_names):
     # 현재온도
     난방.register_status(
         message_flag=message_flag,
@@ -391,7 +388,6 @@ for idx, room in enumerate(room_names):
             ''.join([r'([0-9a-fA-F]{2})' if i == idx * 2 else r'[0-9a-fA-F]{2}' for i in range(4 * 2)])
         ),
         process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5,
-        child_name=room
     )
 
     # 설정온도
@@ -404,7 +400,6 @@ for idx, room in enumerate(room_names):
             + ''.join([r'([0-9a-fA-F]{2})' if i == idx * 2 else r'[0-9a-fA-F]{2}' for i in range(4 * 2)])
         ),
         process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5,
-        child_name=room
     )
 
     
