@@ -379,11 +379,11 @@ def process_alltemps(values, mqtt_client):
             base_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방"
             result[f"{base_topic}/targettemp"] = parsed_targettemps[index]
             result[f"{base_topic}/currenttemp"] = parsed_currenttemps[index]
-            result[f"{base_topic}/mode_state_topic"] = power_state[index]
+            result[f"{base_topic}/power"] = power_state[index]
 
             mqtt_client.publish(f"{base_topic}/targettemp", parsed_targettemps[index])
             mqtt_client.publish(f"{base_topic}/currenttemp", parsed_currenttemps[index])
-            mqtt_client.publish(f"{base_topic}/mode_state_topic", power_state[index])
+            mqtt_client.publish(f"{base_topic}/power", power_state[index])
 
         return result
 
