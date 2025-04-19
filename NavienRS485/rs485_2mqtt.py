@@ -343,14 +343,20 @@ def process_alltemps(values):
     logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
     logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
     logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
-    
-    # 상태값 직접 반영
-    for index, room in enumerate(['거실', '안방', '끝방', '중간방']):
-        난방.set_status(room, 'currenttemp', parsed_currenttemps[index])
-        난방.set_status(room, 'targettemp', parsed_targettemps[index])
 
-    # MQTT publish는 하지 않으므로 빈 dict 반환
-    return {}
+    result = {}
+    for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
+        # 상태 반영
+        난방.set_status(child_device, 'targettemp', parsed_targettemps[index])
+        난방.set_status(child_device, 'currenttemp', parsed_currenttemps[index])
+        logging.debug(f"[DEBUG] 상태 반영 - {child_device}: target={parsed_targettemps[index]}, current={parsed_currenttemps[index]}")
+
+        # MQTT용 값도 함께 설정
+        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
+        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
+
+    return result
+
 
 for message_flag in ['81', '01']:
     난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
