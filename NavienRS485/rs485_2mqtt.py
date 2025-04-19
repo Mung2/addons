@@ -45,28 +45,28 @@ class Device:
         }
 
     def parse_payload(self, payload_dict):
-    result = {}
-    for status in self.status_messages[payload_dict['message_flag']]:
-        parse_status = re.match(status['regex'], payload_dict['data'])
-        if not parse_status:
-            continue
+        result = {}
+        for status in self.status_messages[payload_dict['message_flag']]:
+            parse_status = re.match(status['regex'], payload_dict['data'])
+            if not parse_status:
+                continue
 
-        groups = parse_status.groups()
+            groups = parse_status.groups()
 
-        if status['attr_name'] == 'alltemps':
-            temps = status['process_func'](groups)
-            for index, child_device in enumerate(self.child_devices):
-                base_topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}"
-                result[f"{base_topic}/targettemp"] = temps['target'][index]
-                result[f"{base_topic}/currenttemp"] = temps['current'][index]
-        else:
-            for index, child_device in enumerate(self.child_devices):
-                topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
+            if status['attr_name'] == 'alltemps':
+                temps = status['process_func'](groups)
+                for index, child_device in enumerate(self.child_devices):
+                    base_topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}"
+                    result[f"{base_topic}/targettemp"] = temps['target'][index]
+                    result[f"{base_topic}/currenttemp"] = temps['current'][index]
+            else:
+                for index, child_device in enumerate(self.child_devices):
+                    topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
 
-                if (status['attr_name'] in ("power", "away_mode")) and self.device_class == "climate":
-                    result[topic] = status['process_func'](int(groups[0], 16) & (1 << index))
-                else:
-                    result[topic] = status['process_func'](groups[index])
+                    if (status['attr_name'] in ("power", "away_mode")) and self.device_class == "climate":
+                        result[topic] = status['process_func'](int(groups[0], 16) & (1 << index))
+                    else:
+                        result[topic] = status['process_func'](groups[index])
         return result
 
     def get_command_payload(self, attr_name, attr_value, child_name=None):
