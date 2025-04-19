@@ -316,34 +316,46 @@ optional_info = {'modes': ['off', 'heat',], 'temp_step': 0.5, 'precision': 0.5, 
 난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices = ["거실", "안방", "끝방","중간방"], device_class='climate', optional_info=optional_info)
 
 # 로그 포맷 설정
-#logging.basicConfig(
-#    format='%(asctime)s - %(message)s',
-#    level=logging.DEBUG
-#)
+logging.basicConfig(
+    format='%(asctime)s - %(message)s',
+    level=logging.DEBUG
+)
 
-#def process_alltemps(values):
-#    if len(values) != 8:
-#        logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
- #       return
+def process_alltemps(values):
+    if len(values) != 8:
+        logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
+        return {}
 
-  #  parsed_targettemps = []
-   # parsed_currenttemps = []
+    try:
+        parsed_targettemps = []
+        parsed_currenttemps = []
 
-    #for i in range(0, 8, 2):
-  #      t = int(values[i], 16)
- #       c = int(values[i + 1], 16)
+        for i in range(0, 8, 2):
+            t = int(values[i], 16)
+            c = int(values[i + 1], 16)
 
-#        target_temp = t % 128 + t // 128 * 0.5
-#        current_temp = c % 128 + c // 128 * 0.5
+            target_temp = t % 128 + t // 128 * 0.5
+            current_temp = c % 128 + c // 128 * 0.5
 
- #       parsed_targettemps.append(target_temp)
-#        parsed_currenttemps.append(current_temp)
+            parsed_targettemps.append(target_temp)
+            parsed_currenttemps.append(current_temp)
 
-#    logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
-#    logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
-#    logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
-#    logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
- #   return
+        logging.debug("----------------------------------------------------------------------------------")
+        logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
+        logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
+        logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
+
+        result = {}
+        for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
+            result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
+            result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
+
+        return result
+
+    except Exception as e:
+        logging.error(f"[ERROR] Failed to process alltemps: {e}")
+        return {}
+
 
 for message_flag in ['81', '01']:
     난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
@@ -363,22 +375,22 @@ for message_flag in ['81', '01']:
                          regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}',
                          process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
     
-    # 디버그용
-   # 난방.register_status(
-   #     message_flag=message_flag,
-  #      attr_name='alltemps',
- #       topic_class=None,  # MQTT publish 안 하므로 None
-  #      regex=r'00[0-9a-fA-F]{8}'              # 0D 00 (상태 바이트), 0F (ID), 00
-   #           r'([0-9a-fA-F]{2})'              # T1
-   #           r'([0-9a-fA-F]{2})'              # C1
-    #          r'([0-9a-fA-F]{2})'              # T2
-    #          r'([0-9a-fA-F]{2})'              # C2
-     #         r'([0-9a-fA-F]{2})'              # T3
-     #         r'([0-9a-fA-F]{2})'              # C3
-     #         r'([0-9a-fA-F]{2})'              # T4
-     #         r'([0-9a-fA-F]{2})',             # C4
-     #   process_func=process_alltemps
-  #  )
+    #디버그용
+    난방.register_status(
+        message_flag=message_flag,
+        attr_name='alltemps',
+        topic_class=None,  # MQTT publish 안 하므로 None
+        regex=r'00[0-9a-fA-F]{8}'              # 0D 00 (상태 바이트), 0F (ID), 00
+              r'([0-9a-fA-F]{2})'              # T1
+              r'([0-9a-fA-F]{2})'              # C1
+              r'([0-9a-fA-F]{2})'              # T2
+              r'([0-9a-fA-F]{2})'              # C2
+              r'([0-9a-fA-F]{2})'              # T3
+              r'([0-9a-fA-F]{2})'              # C3
+              r'([0-9a-fA-F]{2})'              # T4
+              r'([0-9a-fA-F]{2})',             # C4
+        process_func=process_alltemps
+    )
 
     
     # 명령들
