@@ -45,26 +45,30 @@ class Device:
         }
 
     def parse_payload(self, payload_dict):
-        result = {}
-        for status in self.status_messages[payload_dict['message_flag']]:
-            parse_status = re.match(status['regex'], payload_dict['data'])
-            if not parse_status:
-                continue
+    result = {}
+    for status in self.status_messages[payload_dict['message_flag']]:
+        parse_status = re.match(status['regex'], payload_dict['data'])
+        if not parse_status:
+            continue
 
-            groups = parse_status.groups()
+        groups = parse_status.groups()
 
-            if len(self.child_devices) > 0:
-                for index, child_device in enumerate(self.child_devices):
-                    topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
+        if status['attr_name'] == 'alltemps':
+            temps = status['process_func'](groups)
+            for index, child_device in enumerate(self.child_devices):
+                base_topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}"
+                result[f"{base_topic}/targettemp"] = temps['target'][index]
+                result[f"{base_topic}/currenttemp"] = temps['current'][index]
+        else:
+            for index, child_device in enumerate(self.child_devices):
+                topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
 
-                    if (status['attr_name'] in ("power", "away_mode")) and self.device_class == "climate":
-                        result[topic] = status['process_func'](int(groups[0], 16) & (1 << index))
-                    else:
-                        result[topic] = status['process_func'](groups[index])
-            else:
-                topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{self.device_name}/{status['attr_name']}"
-                result[topic] = status['process_func'](groups[0])
-        return result
+                if (status['attr_name'] in ("power", "away_mode")) and self.device_class == "climate":
+                    result[topic] = status['process_func'](int(groups[0], 16) & (1 << index))
+                else:
+                    result[topic] = status['process_func'](groups[index])
+
+    return result
 
     def get_command_payload(self, attr_name, attr_value, child_name=None):
         # print(self.device_name, self.device_subid, attr_value)
@@ -318,6 +322,18 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
+def process_alltemps(values):
+    ttemps = values[:4]  # 설정온도
+    ctemps = values[4:]  # 현재온도
+
+    parsed_target = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in ttemps]
+    parsed_current = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in ctemps]
+
+    logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(ttemps)}, parsed temps: {', '.join([f'{t:.1f}' for t in parsed_target])}")
+    logging.debug(f"[DEBUG] currenttemp - raw packets: {', '.join(ctemps)}, parsed temps: {', '.join([f'{t:.1f}' for t in parsed_current])}")
+
+    return {'target': parsed_target, 'current': parsed_current}
+
 def process_packet(v):
     logging.debug(f"[DEBUG] raw packet: {v}")  # 들어오는 원본 패킷을 디버그로 출력
     return v
@@ -350,10 +366,6 @@ def process_targettemps(value):
     logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
     return parsed_temps
 
-
-
-
-
 for message_flag in ['81', '01']:
     난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
                          regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}',
@@ -363,14 +375,19 @@ for message_flag in ['81', '01']:
                          regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
                          process_func=lambda v: 'ON' if v != 0 else 'OFF')
 
-    # 현재 온도
-    난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic',
-                         regex=r'00[0-9a-fA-F]{6}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
-                         process_func=process_currenttemps)
-    # 설정 온도
-    난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic',
-                         regex=r'00[0-9a-fA-F]{6}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
-                         process_func=process_targettemps)
+    # 현재온도/설정온도
+    난방.register_status(
+    message_flag=message_flag,
+    attr_name='alltemps',
+    topic_class=None,  # 이건 따로 publish 안 할 거니까 None
+    regex=r'00[0-9a-fA-F]{6}'                # 버리는 6자리
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 설정 온도
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 현재 온도
+          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
+    process_func=process_alltemps
+    )
+
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
                           controll_id=['11', '12', '13', '14'],
