@@ -344,11 +344,13 @@ def process_alltemps(values):
     logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
     logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
 
-    result = {}
-    for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
-        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
+    # 상태 직접 반영
+    for i, room in enumerate(["거실", "안방", "끝방", "중간방"]):
+        난방.register_status(room, 'currenttemp', parsed_currenttemps[i])
+        난방.register_status(room, 'targettemp', parsed_targettemps[i])
 
+    # result 반환
+    result = {"currenttemps": parsed_currenttemps, "targettemps": parsed_targettemps}
     return result
 
 for message_flag in ['81', '01']:
