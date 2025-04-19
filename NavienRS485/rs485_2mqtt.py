@@ -321,49 +321,98 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-def process_alltemps(values, mqtt_client):
-    if len(values) != 9:
-        logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
-        return {}
+def parse_ksx4506_heating_status(packet: bytes):
+    """
+    KSX4506 상태 응답(0x81) 패킷에서 각 방의 난방 상태, 현재온도, 설정온도 추출
+    :param packet: bytes 형태의 패킷
+    :return: 리스트 of dicts [{power: 'heat'|'away'|'off', current_temp: float, target_temp: float}, ...]
+    """
+    # 필수 길이 체크
+    if len(packet) < 10:
+        return []
 
     try:
-        power_raw = values[0]
-        power_state = 'heat' if int(power_raw, 16) != 0 else 'off'
+        # 패킷 중 실제 데이터 시작 위치 탐색 (명세서 기준 DATA 0 ~ DATA 4 이후부터 온도 제어기당 2바이트씩 반복)
+        # => 온도제어기 상태는 5바이트 이후부터 시작
+        base_index = 8  # F7 36 1F 81 0D 00 XX 이후부터가 일반적으로 시작
 
-        parsed_targettemps = []
-        parsed_currenttemps = []
+        # 제어기 수 (예: 0D면 13개, 하지만 보통 4개인 경우가 많음)
+        device_count = packet[base_index]
 
-        for i in range(1, 9, 2):
-            t = int(values[i], 16)
-            c = int(values[i + 1], 16)
+        data_start = base_index + 1
+        result = []
 
-            target_temp = t % 128 + t // 128 * 0.5
-            current_temp = c % 128 + c // 128 * 0.5
+        for i in range(device_count):
+            offset = data_start + i * 5
+            if offset + 4 >= len(packet):
+                break
 
-            parsed_targettemps.append(target_temp)
-            parsed_currenttemps.append(current_temp)
+            # 난방 상태 비트 (bit 0)
+            heat_byte = packet[offset]
+            away_byte = packet[offset + 1]
 
-        logging.debug("----------------------------------------------------------------------------------")
-        logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
-        logging.debug(f"[DEBUG] parsed power: {power_state}")
-        logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
-        logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
+            heat_on = heat_byte & 0x01
+            away_on = away_byte & 0x01
 
-        for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-            topic_target = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"
-            topic_current = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"
-            topic_power = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/mode_state_topic"
+            if heat_on:
+                power = "heat"
+            elif away_on:
+                power = "away"
+            else:
+                power = "off"
 
-            mqtt_client.publish(topic_target, parsed_targettemps[index])
-            mqtt_client.publish(topic_current, parsed_currenttemps[index])
-            mqtt_client.publish(topic_power, power_state)
+            # 현재 온도
+            current_raw = packet[offset + 3]
+            current_temp = ((current_raw & 0x7F) / 2.0) if current_raw != 0 else 0.0
 
-        return {}
+            # 설정 온도
+            target_raw = packet[offset + 4]
+            target_temp = ((target_raw & 0x7F) / 2.0) if target_raw != 0 else 0.0
+
+            result.append({
+                "power": power,
+                "current_temp": current_temp,
+                "target_temp": target_temp,
+            })
+
+        return result
 
     except Exception as e:
-        logging.error(f"[ERROR] Failed to process alltemps: {e}")
-        return {}
+        print(f"[ERROR] Packet parsing failed: {e}")
+        return []
 
+def process_alltemps(values, mqtt_client):
+    # 패킷이 hex string 리스트라고 가정: ['f7', '36', ...]
+    try:
+        # hex 문자열 리스트 -> 바이트로 변환
+        packet = bytes(int(v, 16) for v in values)
+
+        # 패킷 파싱
+        parsed_rooms = parse_ksx4506_heating_status(packet)
+
+        # 방 이름은 상황에 따라 맞게 수정
+        room_names = ["거실", "안방", "중간방", "끝방"]
+
+        for i, room in enumerate(parsed_rooms):
+            if i >= len(room_names):
+                break
+
+            room_name = room_names[i]
+            power = room['power']
+            current_temp = room['current_temp']
+            target_temp = room['target_temp']
+
+            # 예시 MQTT 토픽
+            base_topic = f"wallpad/heating/{room_name}"
+
+            mqtt_client.publish(f"{base_topic}/power", power, retain=True)
+            mqtt_client.publish(f"{base_topic}/current_temperature", current_temp, retain=True)
+            mqtt_client.publish(f"{base_topic}/target_temperature", target_temp, retain=True)
+
+            print(f"[{room_name}] Power: {power}, Current: {current_temp}, Target: {target_temp}")
+
+    except Exception as e:
+        print(f"[ERROR] Failed to process alltemps: {e}")
 
 for message_flag in ['81', '01']:
     #난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
@@ -389,7 +438,7 @@ for message_flag in ['81', '01']:
         message_flag=message_flag,
         attr_name='alltemps',
         topic_class=None,  # MQTT publish 안 하므로 None
-        regex=r'00([0-9a-fA-F]{2})' + ''.join([r'([0-9a-fA-F]{2})' for _ in range(8)]),
+        regex=r'.*',
         process_func=partial(process_alltemps, mqtt_client=wallpad.mqtt_client))
 
     
