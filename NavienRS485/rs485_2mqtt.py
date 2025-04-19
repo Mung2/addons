@@ -322,15 +322,18 @@ logging.basicConfig(
 )
 
 def process_alltemps(values, mqtt_client):
-    if len(values) != 8:
+    if len(values) != 9:
         logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
         return {}
 
     try:
+        power_raw = values[0]
+        power_state = 'heat' if int(power_raw, 16) != 0 else 'off'
+
         parsed_targettemps = []
         parsed_currenttemps = []
 
-        for i in range(0, 8, 2):
+        for i in range(1, 9, 2):
             t = int(values[i], 16)
             c = int(values[i + 1], 16)
 
@@ -342,35 +345,31 @@ def process_alltemps(values, mqtt_client):
 
         logging.debug("----------------------------------------------------------------------------------")
         logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
+        logging.debug(f"[DEBUG] parsed power: {power_state}")
         logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
         logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
 
-        result = {}
         for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
             topic_target = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"
             topic_current = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"
+            topic_power = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/mode_state_topic"
 
-            value_target = parsed_targettemps[index]
-            value_current = parsed_currenttemps[index]
+            mqtt_client.publish(topic_target, parsed_targettemps[index])
+            mqtt_client.publish(topic_current, parsed_currenttemps[index])
+            mqtt_client.publish(topic_power, power_state)
 
-            result[topic_target] = value_target
-            result[topic_current] = value_current
-
-            # ✅ 수동 publish 추가
-            mqtt_client.publish(topic_target, value_target)
-            mqtt_client.publish(topic_current, value_current)
-
-        return result
+        return {}
 
     except Exception as e:
         logging.error(f"[ERROR] Failed to process alltemps: {e}")
         return {}
 
+
 for message_flag in ['81', '01']:
-    난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
-                         regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}',
-                         process_func=lambda v: logging.debug(f"[DEBUG][power] raw: {v}") or ('heat' if int(v, 16) != 0 else 'off')
-    )
+    #난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
+    #                     regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}',
+    #                     process_func=lambda v: logging.debug(f"[DEBUG][power] raw: {v}") or ('heat' if int(v, 16) != 0 else 'off')
+    #)
 
     #난방.register_status(message_flag=message_flag, attr_name='away_mode', topic_class='away_mode_state_topic',
     #                     regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
@@ -390,16 +389,8 @@ for message_flag in ['81', '01']:
         message_flag=message_flag,
         attr_name='alltemps',
         topic_class=None,  # MQTT publish 안 하므로 None
-        regex=r'00[0-9a-fA-F]{8}'              # 0D 00 (상태 바이트), 0F (ID), 00
-              r'([0-9a-fA-F]{2})'              # T1
-              r'([0-9a-fA-F]{2})'              # C1
-              r'([0-9a-fA-F]{2})'              # T2
-              r'([0-9a-fA-F]{2})'              # C2
-              r'([0-9a-fA-F]{2})'              # T3
-              r'([0-9a-fA-F]{2})'              # C3
-              r'([0-9a-fA-F]{2})'              # T4
-              r'([0-9a-fA-F]{2})',             # C4
-        process_func=partial(process_alltemps, mqtt_client=wallpad.mqtt_client)
+        regex=regex=r'00([0-9a-fA-F]{2})' + ''.join([r'([0-9a-fA-F]{2})' for _ in range(8)])
+        process_func=lambda values: process_alltemps(values, mqtt_client=self.mqtt_client)
     )
 
     
