@@ -367,8 +367,9 @@ def process_currenttemp(v):
     logging.debug(f"[DEBUG] currenttemp - raw packet: {v}, parsed temp: {temp}")
     return temp
 
-def process_currenttemps(values):
-    # 값들을 한 번에 처리하여 출력
+def process_currenttemps(value):
+    # value는 8바이트 (16자리 문자열): '1497141713171417'
+    values = [value[i:i+2] for i in range(0, len(value), 2)]
     parsed_temps = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in values]
     temp_str = ', '.join([f"{temp:.1f}" for temp in parsed_temps])
     logging.debug(f"[DEBUG] currenttemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
@@ -379,12 +380,14 @@ def process_targettemp(v):
     logging.debug(f"[DEBUG] targettemp - raw packet: {v}, parsed temp: {temp}")
     return temp
 
-def process_targettemps(values):
-    # 값들을 한 번에 처리하여 출력
+def process_targettemps(value):
+    # value는 8바이트 (16자리 문자열): '1497141713171417'
+    values = [value[i:i+2] for i in range(0, len(value), 2)]
     parsed_temps = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in values]
     temp_str = ', '.join([f"{temp:.1f}" for temp in parsed_temps])
     logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(values)}, parsed temps: {temp_str}")
     return parsed_temps
+
 
 
 
@@ -400,11 +403,11 @@ for message_flag in ['81', '01']:
 
     # 현재 온도
     난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic',
-                         regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
+                         regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{8})',
                          process_func=process_currenttemps)
     # 설정 온도
     난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic',
-                         regex=r'00[0-9a-fA-F]{8}[0-9a-fA-F]{2}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
+                         regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{8})',
                          process_func=process_targettemps)
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
