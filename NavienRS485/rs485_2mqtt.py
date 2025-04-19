@@ -381,6 +381,18 @@ for message_flag in ['81', '01']:
               r'([0-9a-fA-F]{2})',             # C4
         process_func=process_alltemps
     )
+
+for room in ["거실", "안방", "끝방", "중간방"]:
+    난방.register_status(
+        message_flag=message_flag,
+        attr_name='currenttemp',
+        topic_class='current_temperature_topic',
+    )
+    난방.register_status(
+        message_flag=message_flag,
+        attr_name='targettemp',
+        topic_class='target_temperature_topic',
+    )
     
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
