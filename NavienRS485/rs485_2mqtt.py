@@ -355,7 +355,7 @@ def process_alltemps(values, mqtt_client):
         parsed_targettemps = []
         parsed_currenttemps = []
 
-        for i in range(2, 9, 2):
+        for i in range(2, 8, 2):
             t = int(values[i], 16)
             c = int(values[i + 1], 16)
             target_temp = t % 128 + t // 128 * 0.5
