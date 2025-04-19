@@ -396,16 +396,15 @@ for message_flag in ['81', '01']:
         message_flag=message_flag,
         attr_name='alltemps',
         topic_class=None,  # MQTT publish 안 하므로 None
-        regex = (
-            r'00[0-9a-fA-F]{4}'              # 0D 00 (상태 바이트), 0F (ID), 00
-            r'([0-9a-fA-F]{2})'              # T1
-            r'([0-9a-fA-F]{2})'              # C1
-            r'([0-9a-fA-F]{2})'              # T2
-            r'([0-9a-fA-F]{2})'              # C2
-            r'([0-9a-fA-F]{2})'              # T3
-            r'([0-9a-fA-F]{2})'              # C3
-            r'([0-9a-fA-F]{2})'              # T4
-            r'([0-9a-fA-F]{2})',             # C4
+        regex=r'00[0-9a-fA-F]{4}'              # 0D 00 (상태 바이트), 0F (ID), 00
+              r'([0-9a-fA-F]{2})'              # T1
+              r'([0-9a-fA-F]{2})'              # C1
+              r'([0-9a-fA-F]{2})'              # T2
+              r'([0-9a-fA-F]{2})'              # C2
+              r'([0-9a-fA-F]{2})'              # T3
+              r'([0-9a-fA-F]{2})'              # C3
+              r'([0-9a-fA-F]{2})'              # T4
+              r'([0-9a-fA-F]{2})',             # C4
         process_func=process_alltemps
     )
 
