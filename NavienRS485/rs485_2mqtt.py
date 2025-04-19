@@ -68,7 +68,7 @@ class Device:
                 else:
                     result[topic] = status['process_func'](groups[index])
 
-    return result
+        return result
 
     def get_command_payload(self, attr_name, attr_value, child_name=None):
         # print(self.device_name, self.device_subid, attr_value)
