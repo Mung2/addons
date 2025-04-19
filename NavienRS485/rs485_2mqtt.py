@@ -344,13 +344,14 @@ def process_alltemps(values):
     logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
     logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
 
-    # 상태 직접 반영
     for i, room in enumerate(["거실", "안방", "끝방", "중간방"]):
-        난방.register_status(room, 'currenttemp', parsed_currenttemps[i])
-        난방.register_status(room, 'targettemp', parsed_targettemps[i])
+        난방.set_status(room, 'currenttemp', parsed_currenttemps[i])
+        난방.set_status(room, 'targettemp', parsed_targettemps[i])
 
-    # result 반환
-    result = {"currenttemps": parsed_currenttemps, "targettemps": parsed_targettemps}
+        # 👉 상태를 Home Assistant에 MQTT로 publish
+        난방.publish_status(room, 'currenttemp')
+        난방.publish_status(room, 'targettemp')
+
     return result
 
 for message_flag in ['81', '01']:
