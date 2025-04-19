@@ -374,18 +374,19 @@ for message_flag in ['81', '01']:
                          regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
                          process_func=lambda v: 'ON' if v != 0 else 'OFF')
 
-    # 현재온도/설정온도
+    # 현재온도/설정온도 함께 처리
     난방.register_status(
-    message_flag=message_flag,
-    attr_name='alltemps',
-    topic_class=None,  # 이건 따로 publish 안 할 거니까 None
-    regex=r'00[0-9a-fA-F]{6}'                # 버리는 6자리
-          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 설정 온도
-          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'
-          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 현재 온도
-          r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
-    process_func=process_alltemps
+        message_flag=message_flag,
+        attr_name='alltemps',
+        topic_class=None,  # MQTT publish 안 하므로 None
+        regex=r'00[0-9a-fA-F]{10}'                # 버리는 10자리
+              r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 거실
+              r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 안방
+              r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})'  # 끝방
+              r'([0-9a-fA-F]{2})([0-9a-fA-F]{2})', # 중간방
+        process_func=process_alltemps
     )
+
 
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
