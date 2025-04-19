@@ -313,7 +313,7 @@ optional_info = {'optimistic': 'false'}
 
 # 난방
 optional_info = {
-    'modes': ['off', 'heat'],
+    'modes': ['off', 'heat', 'away'],
     'preset_modes': ['none', 'away'],
     'temp_step': 0.5,
     'precision': 0.5,
