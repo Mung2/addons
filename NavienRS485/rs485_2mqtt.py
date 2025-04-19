@@ -345,13 +345,16 @@ def process_alltemps(values):
     logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
 
     result = {}
+    # 상태 반영을 위한 로그 추가
     for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
+        # 상태 반영 로그
+        logging.debug(f"[DEBUG] 상태 반영 - {child_device}: target={parsed_targettemps[index]}, current={parsed_currenttemps[index]}")
+        
         # 상태 반영
         난방.set_status(child_device, 'targettemp', parsed_targettemps[index])
         난방.set_status(child_device, 'currenttemp', parsed_currenttemps[index])
-        logging.debug(f"[DEBUG] 상태 반영 - {child_device}: target={parsed_targettemps[index]}, current={parsed_currenttemps[index]}")
 
-        # MQTT용 값도 함께 설정
+        # MQTT 퍼블리시용
         result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
         result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
 
