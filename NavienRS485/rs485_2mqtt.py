@@ -336,9 +336,11 @@ def process_currenttemps(value):
     return parsed_temps
 
 def process_targettemp(v):
-    temp = int(v, 16) % 128 + int(v, 16) // 128 * 0.5
-    logging.debug(f"[DEBUG] targettemp - raw packet: {v}, parsed temp: {temp}")
-    return temp
+    # 각 바이트를 합쳐서 온도 계산
+    temp = [int(val, 16) for val in v]
+    final_temp = (temp[0] + temp[1] * 256) / 2  # 예시: 온도값을 계산하는 방식
+    logging.debug(f"[DEBUG] targettemp - raw packet: {v}, parsed temp: {final_temp}")
+    return final_temp
 
 def process_targettemps(value):
     # value는 8바이트 (16자리 문자열): '1497141713171417'
@@ -363,11 +365,11 @@ for message_flag in ['81', '01']:
 
     # 현재 온도
     난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic',
-                         regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',
+                         regex=r'00[0-9a-fA-F]{6}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
                          process_func=process_currenttemps)
     # 설정 온도
     난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic',
-                         regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',
+                         regex=r'00[0-9a-fA-F]{6}([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})',
                          process_func=process_targettemps)
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
