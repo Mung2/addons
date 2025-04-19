@@ -321,14 +321,6 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-def set_status(self, room, attr_name, value):
-    # 상태를 업데이트하는 예시
-    if room not in self.status:
-        self.status[room] = {}
-    
-    self.status[room][attr_name] = value
-    logging.debug(f"[DEBUG] 상태 반영 - {room}: {attr_name}={value}")
-
 def process_alltemps(values):
     if len(values) != 8:
         logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
@@ -353,22 +345,11 @@ def process_alltemps(values):
     logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
 
     result = {}
-    # 상태 반영을 위한 로그 추가
     for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-        난방.set_status(child_device, 'targettemp', parsed_targettemps[index])
-        난방.set_status(child_device, 'currenttemp', parsed_currenttemps[index])
+        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
+        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
 
-        # 상태 변경 후 바로 상태를 확인
-        current_targettemp = 난방.get_status(child_device, 'targettemp')
-        current_currenttemp = 난방.get_status(child_device, 'currenttemp')
-
-        logging.debug(f"[DEBUG] 상태 반영 확인 - {child_device}: target={current_targettemp}, current={current_currenttemp}")
     return result
-
-def get_status(self, room, attr_name):
-    # 상태를 반환하는 예시
-    return self.status.get(room, {}).get(attr_name, None)
-
 
 for message_flag in ['81', '01']:
     난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
@@ -396,6 +377,37 @@ for message_flag in ['81', '01']:
         process_func=process_alltemps
     )
 
+room_names = ["거실", "안방", "끝방", "중간방"]
+
+for idx, room in enumerate(room_names):
+    # 현재온도
+    난방.register_status(
+        message_flag=message_flag,
+        attr_name='currenttemp',
+        topic_class='current_temperature_topic',
+        regex=(
+            r'00[0-9a-fA-F]{6}'
+            + ''.join([r'[0-9a-fA-F]{2}' for _ in range(2)]) +   # 설정온도 2개 스킵
+            ''.join([r'([0-9a-fA-F]{2})' if i == idx * 2 else r'[0-9a-fA-F]{2}' for i in range(4 * 2)])
+        ),
+        process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5,
+        child_name=room
+    )
+
+    # 설정온도
+    난방.register_status(
+        message_flag=message_flag,
+        attr_name='targettemp',
+        topic_class='temperature_state_topic',
+        regex=(
+            r'00[0-9a-fA-F]{6}'
+            + ''.join([r'([0-9a-fA-F]{2})' if i == idx * 2 else r'[0-9a-fA-F]{2}' for i in range(4 * 2)])
+        ),
+        process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5,
+        child_name=room
+    )
+
+    
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
                           controll_id=['11', '12', '13', '14'],
