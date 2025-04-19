@@ -339,17 +339,21 @@ def process_alltemps(values, mqtt_client):
         heat_hex = values[1]
         temp_bytes = values[2:]
 
-        away_bits = format(int(away_hex, 16), '08b')[4:]  # 뒤 4비트
-        heat_bits = format(int(heat_hex, 16), '08b')[4:]
+        # 비트 reverse (LSB부터 적용하기 위해)
+        away_bits = format(int(values[0], 16), '08b')[::-1]
+        heat_bits = format(int(values[1], 16), '08b')[::-1]
 
-        power_states = []
-        for a, h in zip(away_bits, heat_bits):
-            if a == '0' and h == '0':
-                power_states.append('off')
-            elif a == '1' and h == '0':
-                power_states.append('away')
+        parsed_power = []
+        for i in range(4):
+            bits = away_bits[i + 4] + heat_bits[i + 4]  # 뒤쪽 4비트만 사용
+            if bits == '00':
+                parsed_power.append('off')
+            elif bits == '01':
+                parsed_power.append('heat')
+            elif bits == '10':
+                parsed_power.append('away')
             else:
-                power_states.append('heat')
+                parsed_power.append('unknown')
 
         parsed_targettemps = []
         parsed_currenttemps = []
