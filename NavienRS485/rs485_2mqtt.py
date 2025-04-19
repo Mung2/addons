@@ -365,7 +365,7 @@ for message_flag in ['81', '01']:
                          regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
                          process_func=lambda v: 'ON' if v != 0 else 'OFF')
 
-    # 현재온도/설정온도 함께 처리
+    # 현재온도/설정온도 함께 처리 디버그용
     난방.register_status(
         message_flag=message_flag,
         attr_name='alltemps',
@@ -382,18 +382,38 @@ for message_flag in ['81', '01']:
         process_func=process_alltemps
     )
 
-for room in ["거실", "안방", "끝방", "중간방"]:
+    # 온도 관련 상태 등록
     난방.register_status(
         message_flag=message_flag,
         attr_name='currenttemp',
         topic_class='current_temperature_topic',
+        regex=r'00[0-9a-fA-F]{8}'              # 0D 00 (상태 바이트), 0F (ID), 00
+              r'([0-9a-fA-F]{2})'              # T1
+              r'([0-9a-fA-F]{2})'              # C1
+              r'([0-9a-fA-F]{2})'              # T2
+              r'([0-9a-fA-F]{2})'              # C2
+              r'([0-9a-fA-F]{2})'              # T3
+              r'([0-9a-fA-F]{2})'              # C3
+              r'([0-9a-fA-F]{2})'              # T4
+              r'([0-9a-fA-F]{2})',             # C4
+        process_func=lambda v: [int(x, 16) % 128 + int(x, 16) // 128 * 0.5 for x in v]
     )
+
     난방.register_status(
         message_flag=message_flag,
         attr_name='targettemp',
-        topic_class='target_temperature_topic',
-    )
-    
+        topic_class='temperature_state_topic',
+        regex=r'00[0-9a-fA-F]{8}'              # 0D 00 (상태 바이트), 0F (ID), 00
+              r'([0-9a-fA-F]{2})'              # T1
+              r'([0-9a-fA-F]{2})'              # C1
+              r'([0-9a-fA-F]{2})'              # T2
+              r'([0-9a-fA-F]{2})'              # C2
+              r'([0-9a-fA-F]{2})'              # T3
+              r'([0-9a-fA-F]{2})'              # C3
+              r'([0-9a-fA-F]{2})'              # T4
+              r'([0-9a-fA-F]{2})',             # C4(v, 16) // 128 * 0.5
+        
+    )  
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
                           controll_id=['11', '12', '13', '14'],
@@ -406,6 +426,5 @@ for room in ["거실", "안방", "끝방", "중간방"]:
     난방.register_command(message_flag='45', attr_name='away_mode', topic_class='away_mode_command_topic',
                           controll_id=['11', '12', '13', '14'],
                           process_func=lambda v: '01' if v == 'ON' else '00')
-
 
 wallpad.listen()
