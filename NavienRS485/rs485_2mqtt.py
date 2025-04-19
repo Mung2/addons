@@ -396,7 +396,7 @@ for message_flag in ['81', '01']:
               r'([0-9a-fA-F]{2})'              # C3
               r'([0-9a-fA-F]{2})'              # T4
               r'([0-9a-fA-F]{2})',             # C4
-        process_func=lambda v: [int(x, 16) % 128 + int(x, 16) // 128 * 0.5 for x in v]
+        process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
     )
 
     난방.register_status(
@@ -412,8 +412,9 @@ for message_flag in ['81', '01']:
               r'([0-9a-fA-F]{2})'              # C3
               r'([0-9a-fA-F]{2})'              # T4
               r'([0-9a-fA-F]{2})',             # C4(v, 16) // 128 * 0.5
-        
+        process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
     )  
+    
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
                           controll_id=['11', '12', '13', '14'],
