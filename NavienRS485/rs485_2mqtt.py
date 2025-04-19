@@ -332,7 +332,7 @@ logging.basicConfig(
 def process_alltemps(values, mqtt_client):
     logging.debug(f"[DEBUG] values received in alltemps: {values}")
 
-    if len(values) != 9:
+    if len(values) != 10:
         logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
         return {}
 
@@ -355,7 +355,7 @@ def process_alltemps(values, mqtt_client):
         parsed_targettemps = []
         parsed_currenttemps = []
 
-        for i in range(2, 8, 2):
+        for i in range(2, 10, 2):
             t = int(values[i], 16)
             c = int(values[i + 1], 16)
             target_temp = t % 128 + t // 128 * 0.5
@@ -392,7 +392,7 @@ for message_flag in ['81', '01']:
         message_flag=message_flag,
         attr_name='alltemps',
         topic_class=None,
-        regex=r'00[0-9a-fA-F]{4}' + ''.join([r'([0-9a-fA-F]{2})' for _ in range(9)]),
+        regex=r'00[0-9a-fA-F]{4}' + ''.join([r'([0-9a-fA-F]{2})' for _ in range(10)]),
         process_func=partial(process_alltemps, mqtt_client=wallpad.mqtt_client)
     )
 
