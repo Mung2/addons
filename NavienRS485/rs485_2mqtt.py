@@ -360,6 +360,11 @@ for message_flag in ['81', '01']:
                          regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
                          process_func=lambda v: 'ON' if v != 0 else 'OFF')
 
+    # 온도 관련 상태 등록
+    난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic', regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',  process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
+
+    난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic', regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}', process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
+    
     # 디버그용
     난방.register_status(
         message_flag=message_flag,
@@ -376,11 +381,6 @@ for message_flag in ['81', '01']:
               r'([0-9a-fA-F]{2})',             # C4
         process_func=process_alltemps
     )
-
-    # 온도 관련 상태 등록
-    난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic', regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',  process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
-
-    난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic', regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}', process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
     
     # 명령들
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
