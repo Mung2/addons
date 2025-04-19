@@ -396,7 +396,7 @@ for message_flag in ['81', '01']:
               r'([0-9a-fA-F]{2})'              # C3
               r'([0-9a-fA-F]{2})'              # T4
               r'([0-9a-fA-F]{2})',             # C4
-        process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
+        process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5
     )
 
     난방.register_status(
@@ -412,7 +412,7 @@ for message_flag in ['81', '01']:
               r'([0-9a-fA-F]{2})'              # C3
               r'([0-9a-fA-F]{2})'              # T4
               r'([0-9a-fA-F]{2})',             # C4(v, 16) // 128 * 0.5
-        process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
+        process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5
     )  
     
     # 명령들
