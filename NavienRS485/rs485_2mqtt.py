@@ -333,17 +333,15 @@ def process_alltemps(values, mqtt_client):
         parsed_currenttemps = []
 
         # 이후 8개 값은 T1 C1 T2 C2 T3 C3 T4 C4
-        for i in range(1, 9, 2):
-            t = int(values[i], 16)
-            c = int(values[i + 1], 16)
+            for i in range(1, 9, 2):
+                t = int(values[i], 16)
+                c = int(values[i + 1], 16)
+                target_temp = t % 128 + t // 128 * 0.5
+                current_temp = c % 128 + c // 128 * 0.5
+                parsed_targettemps.append(target_temp)
+                parsed_currenttemps.append(current_temp)
 
-            target_temp = t % 128 + t // 128 * 0.5
-            current_temp = c % 128 + c // 128 * 0.5
-
-            parsed_targettemps.append(target_temp)
-            parsed_currenttemps.append(current_temp)
-
-        power_state = 'heat' if raw_power != 0 else 'off'
+        power_state = 'heat' if powers[index] else 'off'
 
         logging.debug("----------------------------------------------------------------------------------")
         logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
@@ -355,6 +353,7 @@ def process_alltemps(values, mqtt_client):
         for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
             base_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방"
 
+            result[f"{base_topic}/power"] = power_state
             result[f"{base_topic}/targettemp"] = parsed_targettemps[index]
             result[f"{base_topic}/currenttemp"] = parsed_currenttemps[index]
 
@@ -375,7 +374,7 @@ for message_flag in ['81', '01']:
         message_flag=message_flag,
         attr_name='alltemps',
         topic_class=None,
-        regex=r'00([0-9a-fA-F]{2})' + ''.join([r'([0-9a-fA-F]{2})' for _ in range(8)]),
+        regex=r'00[0-9a-fA-F]{4}' + ''.join([r'([0-9a-fA-F]{2})' for _ in range(9)]),
         process_func=partial(process_alltemps, mqtt_client=wallpad.mqtt_client)
     )
 
