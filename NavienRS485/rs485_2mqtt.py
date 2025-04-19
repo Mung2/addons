@@ -347,15 +347,24 @@ def process_alltemps(values):
 
         result = {}
         for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-            result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
-            result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
+            topic_target = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"
+            topic_current = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"
+
+            value_target = parsed_targettemps[index]
+            value_current = parsed_currenttemps[index]
+
+            result[topic_target] = value_target
+            result[topic_current] = value_current
+
+            # ✅ 수동 publish 추가
+            mqtt.publish(topic_target, value_target)
+            mqtt.publish(topic_current, value_current)
 
         return result
 
     except Exception as e:
         logging.error(f"[ERROR] Failed to process alltemps: {e}")
         return {}
-
 
 for message_flag in ['81', '01']:
     난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic',
