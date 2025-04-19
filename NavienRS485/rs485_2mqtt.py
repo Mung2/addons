@@ -1,7 +1,7 @@
 import paho.mqtt.client as mqtt
 import re
 from json import dumps as json_dumps
-from functools import reduce
+from functools import reduce, partial
 from collections import defaultdict
 import json
 import threading
@@ -398,7 +398,7 @@ for message_flag in ['81', '01']:
               r'([0-9a-fA-F]{2})'              # C3
               r'([0-9a-fA-F]{2})'              # T4
               r'([0-9a-fA-F]{2})',             # C4
-        process_func=process_alltemps
+        process_func=partial(process_alltemps, mqtt_client=wallpad.mqtt_client)
     )
 
     
