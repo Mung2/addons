@@ -390,7 +390,7 @@ for message_flag in ['81', '01']:
         attr_name='alltemps',
         topic_class=None,  # MQTT publish 안 하므로 None
         regex=r'00([0-9a-fA-F]{2})' + ''.join([r'([0-9a-fA-F]{2})' for _ in range(8)]),
-        process_func=partial(process_alltemps, mqtt_client=self.mqtt_client))
+        process_func=partial(process_alltemps, mqtt_client=wallpad.mqtt_client))
 
     
     # 명령들
