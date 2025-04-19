@@ -342,7 +342,7 @@ def process_alltemps(values):
     logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
     logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
     logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
-    logging.debug(f"------------------------------------------------------------")
+    print(f"----------------------------------------------------------------------------------")
     
     result = {}
     for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
