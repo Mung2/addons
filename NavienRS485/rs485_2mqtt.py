@@ -327,19 +327,23 @@ def process_alltemps(values, mqtt_client):
         return {}
 
     try:
+        # 첫 번째 값은 전원 비트
         raw_power = int(values[0], 16)
         parsed_targettemps = []
         parsed_currenttemps = []
 
+        # 이후 8개 값은 T1 C1 T2 C2 T3 C3 T4 C4
         for i in range(1, 9, 2):
             t = int(values[i], 16)
             c = int(values[i + 1], 16)
+
             target_temp = t % 128 + t // 128 * 0.5
             current_temp = c % 128 + c // 128 * 0.5
+
             parsed_targettemps.append(target_temp)
             parsed_currenttemps.append(current_temp)
 
-        power_state = 'off' if raw_power == 0 else 'on'
+        power_state = 'heat' if raw_power != 0 else 'off'
 
         logging.debug("----------------------------------------------------------------------------------")
         logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
@@ -350,10 +354,11 @@ def process_alltemps(values, mqtt_client):
         result = {}
         for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
             base_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방"
+
             result[f"{base_topic}/targettemp"] = parsed_targettemps[index]
             result[f"{base_topic}/currenttemp"] = parsed_currenttemps[index]
-            result[f"{base_topic}/power"] = power_state
 
+            # MQTT 상태 수동 전송
             mqtt_client.publish(f"{base_topic}/targettemp", parsed_targettemps[index])
             mqtt_client.publish(f"{base_topic}/currenttemp", parsed_currenttemps[index])
             mqtt_client.publish(f"{base_topic}/power", power_state)
@@ -365,13 +370,6 @@ def process_alltemps(values, mqtt_client):
         return {}
 
 for message_flag in ['81', '01']:
-    난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic',
-                         regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})',
-                         process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
-
-    난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic',
-                         regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}',
-                         process_func=lambda v: int(v, 16) % 128 + int(v, 16) // 128 * 0.5)
 
     난방.register_status(
         message_flag=message_flag,
@@ -381,16 +379,20 @@ for message_flag in ['81', '01']:
         process_func=partial(process_alltemps, mqtt_client=wallpad.mqtt_client)
     )
 
-    난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic',
-                          controll_id=['11', '12', '13', '14'],
-                          process_func=lambda v: '01' if v == 'heat' else '00')
+    난방.register_command(
+        message_flag='43',
+        attr_name='power',
+        topic_class='mode_command_topic',
+        controll_id=['11', '12', '13', '14'],
+        process_func=lambda v: '01' if v == 'heat' else '00'
+    )
 
-    난방.register_command(message_flag='44', attr_name='targettemp', topic_class='temperature_command_topic',
-                          controll_id=['11', '12', '13', '14'],
-                          process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x'))
-
-    난방.register_command(message_flag='45', attr_name='away_mode', topic_class='away_mode_command_topic',
-                          controll_id=['11', '12', '13', '14'],
-                          process_func=lambda v: '01' if v == 'ON' else '00')
+    난방.register_command(
+        message_flag='44',
+        attr_name='targettemp',
+        topic_class='temperature_command_topic',
+        controll_id=['11', '12', '13', '14'],
+        process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x')
+    )
 
 wallpad.listen()
