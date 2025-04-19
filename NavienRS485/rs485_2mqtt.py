@@ -345,14 +345,9 @@ def process_alltemps(values):
     logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
 
     result = {}
-    
-    for i, room in enumerate(["거실", "안방", "끝방", "중간방"]):
-        난방.set_status(room, 'currenttemp', parsed_currenttemps[i])
-        난방.set_status(room, 'targettemp', parsed_targettemps[i])
-
-        # 👉 상태를 Home Assistant에 MQTT로 publish
-        난방.publish_status(room, 'currenttemp')
-        난방.publish_status(room, 'targettemp')
+    for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
+        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
+        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
 
     return result
 
