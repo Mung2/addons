@@ -322,16 +322,34 @@ logging.basicConfig(
 )
 
 def process_alltemps(values):
-    ttemps = values[:4]  # 설정온도
-    ctemps = values[4:]  # 현재온도
+    # values: 총 8개 그룹 - [설정1, 현재1, 설정2, 현재2, 설정3, 현재3, 설정4, 현재4]
+    if len(values) != 8:
+        logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
+        return {}
 
-    parsed_target = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in ttemps]
-    parsed_current = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in ctemps]
+    parsed_targettemps = []
+    parsed_currenttemps = []
 
-    logging.debug(f"[DEBUG] currenttemp - raw packets: {', '.join(ctemps)}, parsed temps: {', '.join([f'{t:.1f}' for t in parsed_current])}")
-    logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(ttemps)}, parsed temps: {', '.join([f'{t:.1f}' for t in parsed_target])}")
+    for i in range(0, 8, 2):
+        target = int(values[i], 16) % 128 + int(values[i], 16) // 128 * 0.5
+        current = int(values[i+1], 16) % 128 + int(values[i+1], 16) // 128 * 0.5
+        parsed_targettemps.append(target)
+        parsed_currenttemps.append(current)
 
-    return {'target': parsed_target, 'current': parsed_current}
+    logging.debug(f"[DEBUG] alltemps - raw packets: {', '.join(values)}")
+    logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
+    logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
+
+    result = {}
+
+    for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
+        target_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"
+        current_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"
+
+        result[target_topic] = parsed_targettemps[index]
+        result[current_topic] = parsed_currenttemps[index]
+
+    return result
 
 def process_packet(v):
     logging.debug(f"[DEBUG] raw packet: {v}")  # 들어오는 원본 패킷을 디버그로 출력
