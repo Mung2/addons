@@ -321,6 +321,14 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
+def set_status(self, room, attr_name, value):
+    # 상태를 업데이트하는 예시
+    if room not in self.status:
+        self.status[room] = {}
+    
+    self.status[room][attr_name] = value
+    logging.debug(f"[DEBUG] 상태 반영 - {room}: {attr_name}={value}")
+
 def process_alltemps(values):
     if len(values) != 8:
         logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
@@ -347,18 +355,19 @@ def process_alltemps(values):
     result = {}
     # 상태 반영을 위한 로그 추가
     for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-        # 상태 반영 로그
-        logging.debug(f"[DEBUG] 상태 반영 - {child_device}: target={parsed_targettemps[index]}, current={parsed_currenttemps[index]}")
-        
-        # 상태 반영
         난방.set_status(child_device, 'targettemp', parsed_targettemps[index])
         난방.set_status(child_device, 'currenttemp', parsed_currenttemps[index])
 
-        # MQTT 퍼블리시용
-        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
-        result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/currenttemp"] = parsed_currenttemps[index]
+        # 상태 변경 후 바로 상태를 확인
+        current_targettemp = 난방.get_status(child_device, 'targettemp')
+        current_currenttemp = 난방.get_status(child_device, 'currenttemp')
 
+        logging.debug(f"[DEBUG] 상태 반영 확인 - {child_device}: target={current_targettemp}, current={current_currenttemp}")
     return result
+
+def get_status(self, room, attr_name):
+    # 상태를 반환하는 예시
+    return self.status.get(room, {}).get(attr_name, None)
 
 
 for message_flag in ['81', '01']:
