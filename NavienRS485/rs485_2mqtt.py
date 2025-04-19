@@ -335,25 +335,26 @@ def process_alltemps(values, mqtt_client):
         return {}
 
     try:
-        byte1 = int(values[0], 16)  # away 상태 비트
-        byte2 = int(values[1], 16)  # heat/off 상태 비트
+        # 1. 전원 상태 (heat / away 비트)
+        heat_byte = int(values[0], 16)
+        away_byte = int(values[1], 16)
 
-        # 이진 문자열로 변환하고 앞쪽 4비트는 버리고 뒤쪽 4비트만 사용
-        away_bits = format(byte1, '08b')[4:]   # byte1 → away
-        heat_bits = format(byte2, '08b')[4:]   # byte2 → heat/off
+        heat_bits = format(heat_byte, '08b')[-4:]  # 하위 4비트
+        away_bits = format(away_byte, '08b')[-4:]
 
-        # 각 방 상태 계산 (중간방, 끝방, 안방, 거실 순)
-        parsed_power = []
-        for a_bit, h_bit in zip(away_bits, heat_bits):
-            if a_bit == '1' and h_bit == '0':
-                parsed_power.append('away')
-            elif a_bit == '0' and h_bit == '1':
-                parsed_power.append('heat')
-            elif a_bit == '1' and h_bit == '1':
-                parsed_power.append('heat')  # 우선순위에 따라 heat로 간주
+        # 비트 순서 거꾸로 정렬 (거실 → 안방 → 끝방 → 중간방 순서)
+        power_state = []
+        for h, a in zip(heat_bits[::-1], away_bits[::-1]):
+            if h == '1' and a == '0':
+                power_state.append('heat')
+            elif h == '0' and a == '1':
+                power_state.append('away')
+            elif h == '0' and a == '0':
+                power_state.append('off')
             else:
-                parsed_power.append('off')
+                power_state.append('unknown')
 
+        # 2. 온도 정보
         parsed_targettemps = []
         parsed_currenttemps = []
 
@@ -365,22 +366,24 @@ def process_alltemps(values, mqtt_client):
             parsed_targettemps.append(target_temp)
             parsed_currenttemps.append(current_temp)
 
+        # 3. 로그 출력
         logging.debug("----------------------------------------------------------------------------------")
         logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
-        logging.debug(f"[DEBUG] parsed power: {parsed_power}")
+        logging.debug(f"[DEBUG] parsed power: {power_state}")
         logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
         logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
 
+        # 4. 결과 MQTT publish + 반환
         result = {}
-        for index, child_device in enumerate(['중간방', '끝방', '안방', '거실']):
+        for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
             base_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방"
             result[f"{base_topic}/targettemp"] = parsed_targettemps[index]
             result[f"{base_topic}/currenttemp"] = parsed_currenttemps[index]
-            result[f"{base_topic}/power"] = parsed_power[index]
+            result[f"{base_topic}/mode_state_topic"] = power_state[index]
 
             mqtt_client.publish(f"{base_topic}/targettemp", parsed_targettemps[index])
             mqtt_client.publish(f"{base_topic}/currenttemp", parsed_currenttemps[index])
-            mqtt_client.publish(f"{base_topic}/power", parsed_power[index])
+            mqtt_client.publish(f"{base_topic}/mode_state_topic", power_state[index])
 
         return result
 
