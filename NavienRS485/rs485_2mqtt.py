@@ -328,8 +328,8 @@ def process_alltemps(values):
     parsed_target = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in ttemps]
     parsed_current = [int(v, 16) % 128 + int(v, 16) // 128 * 0.5 for v in ctemps]
 
-    logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(ttemps)}, parsed temps: {', '.join([f'{t:.1f}' for t in parsed_target])}")
     logging.debug(f"[DEBUG] currenttemp - raw packets: {', '.join(ctemps)}, parsed temps: {', '.join([f'{t:.1f}' for t in parsed_current])}")
+    logging.debug(f"[DEBUG] targettemp - raw packets: {', '.join(ttemps)}, parsed temps: {', '.join([f'{t:.1f}' for t in parsed_target])}")
 
     return {'target': parsed_target, 'current': parsed_current}
 
