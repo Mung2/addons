@@ -330,6 +330,8 @@ logging.basicConfig(
 )
 
 def process_alltemps(values, mqtt_client):
+    logging.debug(f"[DEBUG] values received in alltemps: {values}")
+
     if len(values) != 9:
         logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
         return {}
