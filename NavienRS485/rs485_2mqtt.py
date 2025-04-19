@@ -340,9 +340,9 @@ def process_alltemps(values):
         parsed_currenttemps.append(current_temp)
 
     logging.debug(f"[DEBUG] alltemps - raw packets: {', '.join(values)}")
-    logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
     logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
-
+    logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
+    
     result = {}
     for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
         result[f"{ROOT_TOPIC_NAME}/climate/{child_device}난방/targettemp"] = parsed_targettemps[index]
