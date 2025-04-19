@@ -312,7 +312,15 @@ optional_info = {'optimistic': 'false'}
 주방.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['51','52'], process_func=lambda v: '01' if v == 'ON' else '00')
 
 # 난방
-optional_info = {'modes': ['off', 'heat'], 'temp_step': 0.5, 'precision': 0.5, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
+optional_info = {
+    'modes': ['off', 'heat'],
+    'preset_modes': ['none', 'away'],
+    'temp_step': 0.5,
+    'precision': 0.5,
+    'min_temp': 10.0,
+    'max_temp': 40.0,
+    'send_if_off': 'false'
+}
 난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices=['거실', '안방', '끝방', '중간방'], device_class='climate', optional_info=optional_info)
 
 # 로그 포맷 설정
@@ -327,11 +335,25 @@ def process_alltemps(values, mqtt_client):
         return {}
 
     try:
-        raw_power = int(values[0], 16)
+        power_byte1 = int(values[0], 16)
+        power_byte2 = int(values[1], 16)
+
+        # 전원 상태 파싱 (bit 단위로 확인)
+        power_states = []
+        for i in range(4):
+            away = (power_byte1 >> (3 - i)) & 1
+            on = (power_byte2 >> (3 - i)) & 1
+            if away:
+                power_states.append("away")
+            elif on:
+                power_states.append("heat")
+            else:
+                power_states.append("off")
+
         parsed_targettemps = []
         parsed_currenttemps = []
 
-        for i in range(1, 9, 2):
+        for i in range(2, 9, 2):
             t = int(values[i], 16)
             c = int(values[i + 1], 16)
             target_temp = t % 128 + t // 128 * 0.5
@@ -339,33 +361,28 @@ def process_alltemps(values, mqtt_client):
             parsed_targettemps.append(target_temp)
             parsed_currenttemps.append(current_temp)
 
-        # 각 방별 전원 상태 추출
-        powers = [(raw_power >> i) & 1 for i in range(4)]
-        parsed_powers = ['heat' if p else 'off' for p in powers]
-
         logging.debug("----------------------------------------------------------------------------------")
         logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
-        logging.debug(f"[DEBUG] parsed power: {parsed_powers}")
+        logging.debug(f"[DEBUG] parsed power: {power_states}")
         logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
         logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
 
         result = {}
-        for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-            base_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방"
-            result[f"{base_topic}/targettemp"] = parsed_targettemps[index]
-            result[f"{base_topic}/currenttemp"] = parsed_currenttemps[index]
-            result[f"{base_topic}/power"] = parsed_powers[index]
+        for i, child in enumerate(['거실', '안방', '끝방', '중간방']):
+            base_topic = f"{ROOT_TOPIC_NAME}/climate/{child}난방"
+            result[f"{base_topic}/targettemp"] = parsed_targettemps[i]
+            result[f"{base_topic}/currenttemp"] = parsed_currenttemps[i]
+            result[f"{base_topic}/power"] = power_states[i]
 
-            mqtt_client.publish(f"{base_topic}/targettemp", parsed_targettemps[index])
-            mqtt_client.publish(f"{base_topic}/currenttemp", parsed_currenttemps[index])
-            mqtt_client.publish(f"{base_topic}/power", parsed_powers[index])
+            mqtt_client.publish(f"{base_topic}/targettemp", parsed_targettemps[i])
+            mqtt_client.publish(f"{base_topic}/currenttemp", parsed_currenttemps[i])
+            mqtt_client.publish(f"{base_topic}/power", power_states[i])
 
         return result
 
     except Exception as e:
         logging.error(f"[ERROR] Failed to process alltemps: {e}")
         return {}
-
 
 for message_flag in ['81', '01']:
 
@@ -391,6 +408,14 @@ for message_flag in ['81', '01']:
         topic_class='temperature_command_topic',
         controll_id=['11', '12', '13', '14'],
         process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x')
+    )
+
+    난방.register_command(
+        message_flag='45', 
+        attr_name='preset_mode', 
+        topic_class='preset_mode_command_topic',
+        controll_id=['11', '12', '13', '14'],
+        process_func=lambda v: '01' if v == 'away' else '00'  # away → 01, none → 00
     )
 
 wallpad.listen()
