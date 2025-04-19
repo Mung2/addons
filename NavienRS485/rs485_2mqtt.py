@@ -344,6 +344,8 @@ def process_alltemps(values):
     logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
     logging.getLogger().handlers[0].stream.write("----------------------------------------------------------------------------------\n")
 
+    result = {}
+    
     for i, room in enumerate(["거실", "안방", "끝방", "중간방"]):
         난방.set_status(room, 'currenttemp', parsed_currenttemps[i])
         난방.set_status(room, 'targettemp', parsed_targettemps[i])
