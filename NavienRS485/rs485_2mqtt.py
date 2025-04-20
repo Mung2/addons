@@ -365,8 +365,8 @@ def process_alltemps(values, mqtt_client):
         # Power 비트 처리
         byte1 = int(values[0], 16)
         byte2 = int(values[1], 16)
-        away_bits = format(byte1, '08b')
-        heat_bits = format(byte2, '08b')
+        away_bits = format(byte2, '08b')
+        heat_bits = format(byte1, '08b')
 
         power_state = []
         for i in range(4):
