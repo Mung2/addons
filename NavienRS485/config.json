@@ -1,6 +1,6 @@
 {
   "name": "Navien Wallpad Controller with RS485(EW11)",
-  "version": "1.2.22",
+  "version": "1.2.23",
   "slug": "navien_wallpad",
   "description": "Navien Wallpad Controller for Homeassistant",
   "arch": [
