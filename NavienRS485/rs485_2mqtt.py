@@ -423,6 +423,12 @@ def process_alltemps(values, mqtt_client):
 for message_flag in ['81', '01']:
 
     난방.register_status(
+        message_flag, attr_name='power',
+        topic_class='mode_state_topic',
+        regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}',
+        process_func=lambda v: 'heat' if v != 0 else 'off')
+    
+    난방.register_status(
         message_flag=message_flag,
         attr_name='alltemps',
         topic_class=None,
