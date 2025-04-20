@@ -227,29 +227,31 @@ class Wallpad:
 
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
-        print(f"[COMMAND] topic: {msg.topic}, payload: {msg.payload}")
-        try:            
-            device = self.get_device(device_name=topic_split[2])
-            command_attr = topic_split[3]
-            
-            if len(device.child_devices) > 0:
-                matched_child = None
-                for child in device.child_devices:
-                    if topic_split[2] == f"{child}{device.device_name}":
-                        matched_child = child
-                        break
-                if matched_child:
-                    payload = device.get_command_payload(command_attr, msg.payload.decode(), child_name=matched_child)
-                else:
-                    raise ValueError(f"No matching child device found for topic: {topic_split[2]}")
+        try:
+            full_device_name = topic_split[2]  # 예: '거실난방'
+            attr_name = topic_split[3]  # 예: 'power'
+            payload = msg.payload.decode()
+
+            # 난방 전용: '거실난방' → device_name='난방', child_name='거실'
+            if full_device_name.endswith('난방'):
+                child_name = full_device_name[:-2]
+                device_name = '난방'
             else:
-                payload = device.get_command_payload(command_attr, msg.payload.decode())
+                child_name = None
+                device_name = full_device_name
 
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+            device = self.get_device(device_name=device_name)
 
-        except ValueError as e:
-            print(e)
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
+            if child_name:
+                payload_bytes = device.get_command_payload(attr_name, payload, child_name=child_name + device_name)
+            else:
+                payload_bytes = device.get_command_payload(attr_name, payload)
+
+            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload_bytes, qos=2, retain=False)
+
+    except Exception as e:    
+        print(e)
+        client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
 
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
