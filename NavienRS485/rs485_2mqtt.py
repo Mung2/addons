@@ -329,35 +329,57 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
+# 이전 값을 저장하는 전역 딕셔너리
+previous_temps = {
+    '거실': {'target': None, 'current': None},
+    '안방': {'target': None, 'current': None},
+    '끝방': {'target': None, 'current': None},
+    '중간방': {'target': None, 'current': None},
+}
+
+# 필터 함수
+def filter_temp(room, temp_type, new_value, threshold=5.0):
+    prev = previous_temps[room][temp_type]
+    if prev is None or abs(prev - new_value) <= threshold:
+        previous_temps[room][temp_type] = new_value
+        return new_value
+    else:
+        logging.warning(f"[WARN] {room} {temp_type} value {new_value} ignored (prev: {prev})")
+        return prev
+
 def process_alltemps(values, mqtt_client):
     if len(values) != 10:
         logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
         return {}
 
     try:
-        # 1. 전원 상태 (heat / away 비트)
-        heat_byte = int(values[0], 16)
-        away_byte = int(values[1], 16)
+        logging.debug("----------------------------------------------------------------------------------")
+        logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
 
-        heat_bits = format(heat_byte, '08b')[-4:]  # 하위 4비트
-        away_bits = format(away_byte, '08b')[-4:]
+        # Power 비트 처리
+        byte1 = int(values[0], 16)
+        byte2 = int(values[1], 16)
+        away_bits = format(byte1, '08b')
+        heat_bits = format(byte2, '08b')
 
-        # 비트 순서 거꾸로 정렬 (거실 → 안방 → 끝방 → 중간방 순서)
         power_state = []
-        for h, a in zip(heat_bits[::-1], away_bits[::-1]):
-            if h == '1' and a == '0':
-                power_state.append('heat')
-            elif h == '0' and a == '1':
-                power_state.append('away')
-            elif h == '0' and a == '0':
+        for i in range(4):
+            ab = away_bits[7 - i]
+            hb = heat_bits[7 - i]
+            code = ab + hb
+            if code == '00':
                 power_state.append('off')
+            elif code == '01':
+                power_state.append('heat')
+            elif code == '10':
+                power_state.append('away')
             else:
                 power_state.append('unknown')
+        logging.debug(f"[DEBUG] parsed power: {power_state}")
 
-        # 2. 온도 정보
+        # 온도 파싱
         parsed_targettemps = []
         parsed_currenttemps = []
-
         for i in range(2, 10, 2):
             t = int(values[i], 16)
             c = int(values[i + 1], 16)
@@ -366,24 +388,25 @@ def process_alltemps(values, mqtt_client):
             parsed_targettemps.append(target_temp)
             parsed_currenttemps.append(current_temp)
 
-        # 3. 로그 출력
-        logging.debug("----------------------------------------------------------------------------------")
-        logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
-        logging.debug(f"[DEBUG] parsed power: {power_state}")
         logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
         logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
 
-        # 4. 결과 MQTT publish + 반환
+        # 결과 생성 및 MQTT publish
         result = {}
         for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
             base_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방"
-            result[f"{base_topic}/targettemp"] = parsed_targettemps[index]
-            result[f"{base_topic}/currenttemp"] = parsed_currenttemps[index]
-            result[f"{base_topic}/power"] = power_state[index]
 
-            mqtt_client.publish(f"{base_topic}/targettemp", parsed_targettemps[index])
-            mqtt_client.publish(f"{base_topic}/currenttemp", parsed_currenttemps[index])
-            mqtt_client.publish(f"{base_topic}/power", power_state[index])
+            # 필터 적용
+            filtered_target = filter_temp(child_device, 'target', parsed_targettemps[index])
+            filtered_current = filter_temp(child_device, 'current', parsed_currenttemps[index])
+
+            result[f"{base_topic}/targettemp"] = filtered_target
+            result[f"{base_topic}/currenttemp"] = filtered_current
+            result[f"{base_topic}/mode_state_topic"] = power_state[index]
+
+            mqtt_client.publish(f"{base_topic}/targettemp", filtered_target)
+            mqtt_client.publish(f"{base_topic}/currenttemp", filtered_current)
+            mqtt_client.publish(f"{base_topic}/mode_state_topic", power_state[index])
 
         return result
 
