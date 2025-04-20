@@ -227,26 +227,30 @@ class Wallpad:
 
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
-        # print(topic_split)
-        # print(msg.payload)
+        print(f"[COMMAND] topic: {msg.topic}, payload: {msg.payload}")
         try:            
-            # 예외처리 - 전열교환기 pesentage가 0일 경우, 전원으로 치환
-            if topic_split[2]=="전열교환기" and topic_split[3]=="percentage" and topic_split[4]=="set" and msg.payload==b'0':
-                topic_split[3]="power"
-                msg.payload = b'OFF'
-            
             device = self.get_device(device_name=topic_split[2])
-            if len(device.child_devices)>0:
-                payload = device.get_command_payload(topic_split[3], msg.payload.decode(),child_name=topic_split[2])
+            command_attr = topic_split[3]
+            
+            if len(device.child_devices) > 0:
+                matched_child = None
+                for child in device.child_devices:
+                    if topic_split[2] == f"{child}{device.device_name}":
+                        matched_child = child
+                        break
+                if matched_child:
+                    payload = device.get_command_payload(command_attr, msg.payload.decode(), child_name=matched_child)
+                else:
+                    raise ValueError(f"No matching child device found for topic: {topic_split[2]}")
             else:
-                payload = device.get_command_payload(topic_split[3], msg.payload.decode())
-                
+                payload = device.get_command_payload(command_attr, msg.payload.decode())
+
             client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
 
         except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
-        
+
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
 
