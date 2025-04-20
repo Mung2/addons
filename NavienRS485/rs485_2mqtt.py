@@ -405,14 +405,15 @@ def process_alltemps(values, mqtt_client):
             # 필터 적용
             filtered_target = filter_temp(child_device, 'target', parsed_targettemps[index])
             filtered_current = filter_temp(child_device, 'current', parsed_currenttemps[index])
+            filtered_power = power_state[index]
 
             result[f"{base_topic}/targettemp"] = filtered_target
             result[f"{base_topic}/currenttemp"] = filtered_current
-            result[f"{base_topic}/mode_state_topic"] = power_state[index]
+            result[f"{base_topic}/mode"] = filtered_power
 
             mqtt_client.publish(f"{base_topic}/targettemp", filtered_target)
             mqtt_client.publish(f"{base_topic}/currenttemp", filtered_current)
-            mqtt_client.publish(f"{base_topic}/mode_state_topic", power_state[index])
+            mqtt_client.publish(f"{base_topic}/mode", filtered_power)
 
         return result
 
