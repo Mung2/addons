@@ -346,7 +346,7 @@ for message_flag in ['81', '01', ]:
     # 3) 현재온도 (4개 방용 그룹 패턴: C1,C2,C3,C4)
     #    parse_payload 에서 groups[index] 가 각 방의 hex 값을 줌
     난방.register_status(
-        message_flag=flag,
+        message_flag=message_flag,
         attr_name   ='currenttemp',
         topic_class ='current_temperature_topic',
         regex       =(
@@ -373,7 +373,7 @@ for message_flag in ['81', '01', ]:
 
     # 4) 설정온도 (T1,T2,T3,T4 그룹)
     난방.register_status(
-        message_flag=flag,
+        message_flag=message_flag,
         attr_name   ='targettemp',
         topic_class ='temperature_state_topic',
         regex       =(
