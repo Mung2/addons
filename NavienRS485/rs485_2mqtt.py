@@ -1,12 +1,11 @@
 import paho.mqtt.client as mqtt
 import re
 from json import dumps as json_dumps
-from functools import reduce, partial
+from functools import reduce
 from collections import defaultdict
 import json
 import threading
 import time
-import logging
 
 MQTT_USERNAME = 'admin'
 MQTT_PASSWORD = 'GoTjd8864!'
@@ -48,25 +47,21 @@ class Device:
         result = {}
         for status in self.status_messages[payload_dict['message_flag']]:
             parse_status = re.match(status['regex'], payload_dict['data'])
-            if not parse_status:
-                continue
-
-            groups = parse_status.groups()
-
-            if status['attr_name'] == 'alltemps':
-                temps = status['process_func'](groups)
-                for index, child_device in enumerate(self.child_devices):
-                    base_topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}"
-                    result[f"{base_topic}/targettemp"] = temps['target'][index]
-                    result[f"{base_topic}/currenttemp"] = temps['current'][index]
-            else:
+            # print(status['regex'], payload_dict['data'])
+            # print(parse_status)
+            if len(self.child_devices)>0:
                 for index, child_device in enumerate(self.child_devices):
                     topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
-
-                    if (status['attr_name'] in ("power", "away_mode")) and self.device_class == "climate":
-                        result[topic] = status['process_func'](int(groups[0], 16) & (1 << index))
+                    # climate일 경우 비트연산으로 예외발생..                    
+                    if (status['attr_name']=="power" or status['attr_name']=="away_mode") and self.device_class=="climate":
+                        result[topic] = status['process_func'](int(parse_status.group(1), 16) & (1 << index))
                     else:
-                        result[topic] = status['process_func'](groups[index])
+                        result[topic] = status['process_func'](parse_status.group(index+1))
+                    
+            else:
+                topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{self.device_name}/{status['attr_name']}"    
+                result[topic] = status['process_func'](parse_status.group(1))
+                # print(result[topic])
         return result
 
     def get_command_payload(self, attr_name, attr_value, child_name=None):
@@ -152,7 +147,12 @@ class Wallpad:
         self.mqtt_client.username_pw_set(username=MQTT_USERNAME, password=MQTT_PASSWORD)
         self.mqtt_client.connect(MQTT_SERVER, 1883)
         self._device_list = []
-
+        # Lock 객체 추가
+        self.command_lock = threading.Lock()
+        # 메시지 발송 후 ACK을 기다리는 타이머
+        self.packet_sent_time = None
+        self.retry_wait_time = 1  # 재전송 대기 시간 (초)
+        
     def listen(self):
         self.register_mqtt_discovery()
         for topic_list in [(topic, 2) for topic in [f"{ROOT_TOPIC_NAME}/dev/raw"] + self.get_topic_list_to_listen()]:
@@ -228,31 +228,36 @@ class Wallpad:
     def _process_command_message(self, client, msg):
         topic_split = msg.topic.split('/')
         try:
-            full_device_name = topic_split[2]  # 예: '거실난방'
-            attr_name = topic_split[3]  # 예: 'power'
-            payload = msg.payload.decode()
+            # 명령을 처리할 때, Lock을 획득합니다.
+            with self.command_lock:
+                device = self.get_device(device_name=topic_split[2])
+                if len(device.child_devices) > 0:
+                    payload = device.get_command_payload(topic_split[3], msg.payload.decode(), child_name=topic_split[2])
+                else:
+                    payload = device.get_command_payload(topic_split[3], msg.payload.decode())
 
-            # 난방 전용: '거실난방' → device_name='난방', child_name='거실'
-            if full_device_name.endswith('난방'):
-                child_name = full_device_name[:-2]
-                device_name = '난방'
-            else:
-                child_name = None
-                device_name = full_device_name
+                # 명령 발송
+                self._send_packet(client, payload)
 
-            device = self.get_device(device_name=device_name)
-
-            if child_name:
-                payload_bytes = device.get_command_payload(attr_name, payload, child_name=child_name + device_name)
-            else:
-                payload_bytes = device.get_command_payload(attr_name, payload)
-
-            client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload_bytes, qos=2, retain=False)
-
-        except Exception as e:    
+        except ValueError as e:
             print(e)
             client.publish(f"{ROOT_TOPIC_NAME}/dev/error", f"Error: {str(e)}", qos=1, retain=True)
-
+            
+    def _send_packet(self, client, payload):
+        # 패킷 발송 (예시: client.publish)
+        print(f"Sending packet: {payload}")  # 디버깅용 출력
+        client.publish(f"{ROOT_TOPIC_NAME}/dev/command", payload, qos=2, retain=False)
+    
+    def on_publish(self, client, userdata, mid):
+        # 발송된 메시지에 대한 ACK을 받았을 때 호출
+        print(f"Message with mid {mid} has been acknowledged.")
+        # 메시지 발송 후 ACK 확인 후 재전송 하지 않음
+        if self.packet_sent_time:
+            ack_time = time.time()
+            if ack_time - self.packet_sent_time > self.retry_wait_time:
+                print(f"Acknowledgement received in {ack_time - self.packet_sent_time} seconds")
+            self.packet_sent_time = None
+            
     def _parse_payload(self, payload_hexstring):
         return re.match(r'f7(?P<device_id>0e|12|32|33|36)(?P<device_subid>[0-9a-f]{2})(?P<message_flag>[0-9a-f]{2})(?:[0-9a-f]{2})(?P<data>[0-9a-f]*)(?P<xor>[0-9a-f]{2})(?P<add>[0-9a-f]{2})', payload_hexstring).groupdict()
 
@@ -266,7 +271,7 @@ class Wallpad:
 
     def on_disconnect(self, client, userdata, rc):
         raise ConnectionError
-        
+
 # 새로운 Wallpad 클래스와 Device 클래스 정의
 wallpad = Wallpad()
 
@@ -318,147 +323,39 @@ optional_info = {'optimistic': 'false'}
 주방.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['51','52'], process_func=lambda v: '01' if v == 'ON' else '00')
 
 # 난방
-optional_info = {
-    'modes': ['off', 'heat', 'away'],
-    'preset_modes': ['none', 'away'],
-    'temp_step': 0.5,
-    'precision': 0.5,
-    'min_temp': 10.0,
-    'max_temp': 40.0,
-    'send_if_off': 'false'
-}
-난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices=['거실', '안방', '끝방', '중간방'], device_class='climate', optional_info=optional_info)
+optional_info = {'modes': ['off', 'heat',], 'temp_step': 0.5, 'precision': 0.5, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
+난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices = ["거실", "안방", "끝방","중간방"], device_class='climate', optional_info=optional_info)
 
-# 로그 포맷 설정
-logging.basicConfig(
-    format='%(asctime)s - %(message)s',
-    level=logging.DEBUG
-)
+# --- 튐 방지용 필터링 상태 저장소 ---
+last_temp = defaultdict(lambda: {'target': None, 'current': None})
 
-# 이전 값을 저장하는 전역 딕셔너리
-previous_temps = {
-    '거실': {'target': None, 'current': None},
-    '안방': {'target': None, 'current': None},
-    '끝방': {'target': None, 'current': None},
-    '중간방': {'target': None, 'current': None},
-}
-
-# 필터 함수
-def filter_temp(room, temp_type, new_value, threshold=5.0):
-    prev = previous_temps[room][temp_type]
-    if prev is None or abs(prev - new_value) <= threshold:
-        previous_temps[room][temp_type] = new_value
-        return new_value
-    else:
-        logging.warning(f"[WARN] {room} {temp_type} value {new_value} ignored (prev: {prev})")
+def filter_temp(room, kind, val):
+    """
+    room: '거실', '안방' 등
+    kind: 'target' 혹은 'current'
+    val : 새로 들어온 온도(float)
+    """
+    prev = last_temp[room][kind]
+    # 5도 이상 차이나면 무시
+    if prev is not None and abs(prev - val) > 5:
         return prev
+    last_temp[room][kind] = val
+    return val
 
-def process_alltemps(values, mqtt_client):
-    if len(values) != 10:
-        logging.warning(f"[WARN] Unexpected number of groups in alltemps: {values}")
-        return {}
+for message_flag in ['81', '01', ]:
+    # 0007000000141619191619
+    난방.register_status(message_flag, attr_name='power', topic_class='mode_state_topic', regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}', process_func=lambda v: 'heat' if v != 0 else 'off')
 
-    try:
-        logging.debug("----------------------------------------------------------------------------------")
-        logging.debug(f"[DEBUG] raw packets: {', '.join(values)}")
-
-        # Power 비트 처리
-        byte1 = int(values[0], 16)
-        byte2 = int(values[1], 16)
-        away_bits = format(byte2, '08b')
-        heat_bits = format(byte1, '08b')
-
-        power_state = []
-        for i in range(4):
-            ab = away_bits[7 - i]
-            hb = heat_bits[7 - i]
-            code = ab + hb
-            if code == '00':
-                power_state.append('off')
-            elif code == '01':
-                power_state.append('heat')
-            elif code == '10':
-                power_state.append('away')
-            else:
-                power_state.append('unknown')
-        logging.debug(f"[DEBUG] parsed power: {power_state}")
-
-        # 온도 파싱
-        parsed_targettemps = []
-        parsed_currenttemps = []
-        for i in range(2, 10, 2):
-            t = int(values[i], 16)
-            c = int(values[i + 1], 16)
-            target_temp = t % 128 + t // 128 * 0.5
-            current_temp = c % 128 + c // 128 * 0.5
-            parsed_targettemps.append(target_temp)
-            parsed_currenttemps.append(current_temp)
-
-        logging.debug(f"[DEBUG] parsed currenttemps: {parsed_currenttemps}")
-        logging.debug(f"[DEBUG] parsed targettemps: {parsed_targettemps}")
-
-        # 결과 생성 및 MQTT publish
-        result = {}
-        for index, child_device in enumerate(['거실', '안방', '끝방', '중간방']):
-            base_topic = f"{ROOT_TOPIC_NAME}/climate/{child_device}난방"
-
-            # 필터 적용
-            filtered_target = filter_temp(child_device, 'target', parsed_targettemps[index])
-            filtered_current = filter_temp(child_device, 'current', parsed_currenttemps[index])
-            filtered_power = power_state[index]
-
-            result[f"{base_topic}/targettemp"] = filtered_target
-            result[f"{base_topic}/currenttemp"] = filtered_current
-            result[f"{base_topic}/mode"] = filtered_power
-
-            mqtt_client.publish(f"{base_topic}/targettemp", filtered_target)
-            mqtt_client.publish(f"{base_topic}/currenttemp", filtered_current)
-            mqtt_client.publish(f"{base_topic}/mode", filtered_power)
-
-        return result
-
-    except Exception as e:
-        logging.error(f"[ERROR] Failed to process alltemps: {e}")
-        return {}
-      
-for message_flag in ['81', '01']:
-
-    난방.register_status(
-        message_flag, attr_name='power',
-        topic_class='mode_state_topic',
-        regex=r'00([0-9a-fA-F]{2})[0-9a-fA-F]{18}',
-        process_func=lambda v: 'heat' if v != 0 else 'off')
+    # 추가적인 상태 등록 (away_mode, targettemp 등)
+    난방.register_status(message_flag=message_flag, attr_name='away_mode', topic_class='away_mode_state_topic', regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}', process_func=lambda v: 'ON' if v != 0 else 'OFF')
     
-    난방.register_status(
-        message_flag=message_flag,
-        attr_name='alltemps',
-        topic_class=None,
-        regex=r'00([0-9a-fA-F]{2})([0-9a-fA-F]{2})[0-9a-fA-F]{4}' + ''.join([r'([0-9a-fA-F]{2})' for _ in range(8)]),
-        process_func=partial(process_alltemps, mqtt_client=wallpad.mqtt_client)
-    )
-
-    난방.register_command(
-        message_flag='43',
-        attr_name='power',
-        topic_class='mode_command_topic',
-        controll_id=['11', '12', '13', '14'],
-        process_func=lambda v: '01' if v == 'heat' else '00'
-    )
-
-    난방.register_command(
-        message_flag='44',
-        attr_name='targettemp',
-        topic_class='temperature_command_topic',
-        controll_id=['11', '12', '13', '14'],
-        process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x')
-    )
-
-    난방.register_command(
-        message_flag='45', 
-        attr_name='preset_mode', 
-        topic_class='preset_mode_command_topic',
-        controll_id=['11', '12', '13', '14'],
-        process_func=lambda v: '01' if v == 'away' else '00'  # away → 01, none → 00
-    )
+    # 온도 관련 상태 등록
+    난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic', regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})', process_func=lambda v, room=[None]: filter_temp(room[0], 'current', int(v,16)%128 + (int(v,16)//128)*0.5))
+    난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic', regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}', process_func=lambda v, room=[None]: filter_temp(room[0], 'current', int(v,16)%128 + (int(v,16)//128)*0.5))
+    
+    # 난방온도 설정 커맨드
+    난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v == 'heat' else '00')
+    난방.register_command(message_flag='44', attr_name='targettemp', topic_class='temperature_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x'))
+    난방.register_command(message_flag='45', attr_name='away_mode', topic_class='away_mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v =='ON' else '00')
 
 wallpad.listen()
