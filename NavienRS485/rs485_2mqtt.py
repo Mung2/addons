@@ -326,17 +326,11 @@ optional_info = {'optimistic': 'false'}
 optional_info = {'modes': ['off', 'heat',], 'temp_step': 0.5, 'precision': 0.5, 'min_temp': 10.0, 'max_temp': 40.0, 'send_if_off': 'false'}
 난방 = wallpad.add_device(device_name='난방', device_id='36', device_subid='1f', child_devices = ["거실", "안방", "끝방","중간방"], device_class='climate', optional_info=optional_info)
 
-# --- 튐 방지용 필터링 상태 저장소 ---
-last_temp = defaultdict(lambda: {'target': None, 'current': None})
+from collections import defaultdict
+last_temp = defaultdict(lambda: {'current': None, 'target': None})
 
 def filter_temp(room, kind, val):
-    """
-    room: '거실', '안방' 등
-    kind: 'target' 혹은 'current'
-    val : 새로 들어온 온도(float)
-    """
     prev = last_temp[room][kind]
-    # 5도 이상 차이나면 무시
     if prev is not None and abs(prev - val) > 5:
         return prev
     last_temp[room][kind] = val
@@ -349,9 +343,57 @@ for message_flag in ['81', '01', ]:
     # 추가적인 상태 등록 (away_mode, targettemp 등)
     난방.register_status(message_flag=message_flag, attr_name='away_mode', topic_class='away_mode_state_topic', regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}', process_func=lambda v: 'ON' if v != 0 else 'OFF')
     
-    # 온도 관련 상태 등록
-    난방.register_status(message_flag=message_flag, attr_name='currenttemp', topic_class='current_temperature_topic', regex=r'00[0-9a-fA-F]{10}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})', process_func=lambda v, room=[None]: filter_temp(room[0], 'current', int(v,16)%128 + (int(v,16)//128)*0.5))
-    난방.register_status(message_flag=message_flag, attr_name='targettemp', topic_class='temperature_state_topic', regex=r'00[0-9a-fA-F]{8}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{2}', process_func=lambda v, room=[None]: filter_temp(room[0], 'current', int(v,16)%128 + (int(v,16)//128)*0.5))
+    # 3) 현재온도 (4개 방용 그룹 패턴: C1,C2,C3,C4)
+    #    parse_payload 에서 groups[index] 가 각 방의 hex 값을 줌
+    난방.register_status(
+        message_flag=flag,
+        attr_name   ='currenttemp',
+        topic_class ='current_temperature_topic',
+        regex       =(
+            r'00[0-9a-fA-F]{10}'      # 앞 10바이트 무시
+            r'([0-9a-fA-F]{2})'       # C1
+            r'[0-9a-fA-F]{2}'         # skip
+            r'([0-9a-fA-F]{2})'       # C2
+            r'[0-9a-fA-F]{2}'         # skip
+            r'([0-9a-fA-F]{2})'       # C3
+            r'[0-9a-fA-F]{2}'         # skip
+            r'([0-9a-fA-F]{2})'       # C4
+        ),
+        process_func=lambda v, idx=[None], room=[None]: (
+            # v 가 단일 문자열이 아니라 parse_payload 에서 그룹별로 호출됩니다.
+            lambda hexstr: filter_temp(
+                room[0], 'current',
+                (int(hexstr,16) % 128) + (int(hexstr,16)//128)*0.5
+            )
+        )(v),
+        # 장치 이름 대신 방이름을 전달하기 위한 hack:
+        # 그룹 n → child_devices[n] 를 room[0]에 저장
+        device_name=None,  # 그대로
+    )
+
+    # 4) 설정온도 (T1,T2,T3,T4 그룹)
+    난방.register_status(
+        message_flag=flag,
+        attr_name   ='targettemp',
+        topic_class ='temperature_state_topic',
+        regex       =(
+            r'00[0-9a-fA-F]{8}'       # 앞 8바이트 무시
+            r'([0-9a-fA-F]{2})'       # T1
+            r'[0-9a-fA-F]{2}'         # skip
+            r'([0-9a-fA-F]{2})'       # T2
+            r'[0-9a-fA-F]{2}'         # skip
+            r'([0-9a-fA-F]{2})'       # T3
+            r'[0-9a-fA-F]{2}'         # skip
+            r'([0-9a-fA-F]{2})'       # T4
+        ),
+        process_func=lambda v, idx=[None], room=[None]: (
+            lambda hexstr: filter_temp(
+                room[0], 'target',
+                (int(hexstr,16) % 128) + (int(hexstr,16)//128)*0.5
+            )
+        )(v),
+        device_name=None,
+    )
     
     # 난방온도 설정 커맨드
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v == 'heat' else '00')
