@@ -1,7 +1,7 @@
 import paho.mqtt.client as mqtt
 import re
 from json import dumps as json_dumps
-from functools import reduce
+from functools import reduce, partial
 from collections import defaultdict
 import json
 import threading
