@@ -393,7 +393,7 @@ for message_flag in ['81', '01', ]:
     )
 
     # 추가적인 상태 등록 (away_mode)
-    난방.register_status(message_flag='81', attr_name='preset_mode', topic_class='preset_mode_state_topic', regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}', process_func=lambda v: 'away' if int(v, 16) != 0 else 'none')
+    난방.register_status(message_flag=message_flag, attr_name='preset_mode', topic_class='preset_mode_state_topic', regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}', process_func=lambda v: 'ON' if int(v, 16) != 0 else 'OFF')
     
     # 난방온도 설정 커맨드
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v == 'heat' else '00')
