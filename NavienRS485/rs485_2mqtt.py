@@ -393,12 +393,12 @@ for message_flag in ['81', '01', ]:
     )
 
     # '81' 플래그(상태 응답)에서만 외출 상태를 파싱하도록
-    난방.register_status(
-    message_flag='81',
-    attr_name='preset_mode',                       # ▶ away_mode 대신
-    topic_class='preset_mode_state_topic',         # ▶ 토픽 클래스도 변경
-    regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
-    process_func=lambda v: 'away' if int(v, 16) != 0 else 'none')
+    #난방.register_status(
+    #message_flag='81',
+    #attr_name='preset_mode',                       # ▶ away_mode 대신
+    #topic_class='preset_mode_state_topic',         # ▶ 토픽 클래스도 변경
+    #regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
+    #process_func=lambda v: 'away' if int(v, 16) != 0 else 'none')
     
     # 난방온도 설정 커맨드
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v == 'heat' else '00')
