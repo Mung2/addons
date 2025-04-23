@@ -53,7 +53,7 @@ class Device:
                 for index, child_device in enumerate(self.child_devices):
                     topic = f"{ROOT_TOPIC_NAME}/{self.device_class}/{child_device}{self.device_name}/{status['attr_name']}"
                     # climate일 경우 비트연산으로 예외발생..                    
-                    if (status['attr_name']=="power" or status['attr_name']=="away_mode") and self.device_class=="climate":
+                    if (status['attr_name']=="power" or status['attr_name']=="preset_mode") and self.device_class=="climate":
                         result[topic] = status['process_func'](int(parse_status.group(1), 16) & (1 << index))
                     else:
                         result[topic] = status['process_func'](parse_status.group(index+1))
