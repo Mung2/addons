@@ -392,12 +392,23 @@ for message_flag in ['81', '01', ]:
         device_name=None,
     )
 
-    # 추가적인 상태 등록 (away_mode)
-    #난방.register_status(message_flag=message_flag, attr_name='preset_mode', topic_class='preset_mode_state_topic', regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}', process_func=lambda v: 'ON' if int(v, 16) != 0 else 'OFF')
+    # '81' 플래그(상태 응답)에서만 외출 상태를 파싱하도록
+    난방.register_status(
+    message_flag='81',
+    attr_name='preset_mode',                       # ▶ away_mode 대신
+    topic_class='preset_mode_state_topic',         # ▶ 토픽 클래스도 변경
+    regex=r'00[0-9a-fA-F]{2}([0-9a-fA-F]{2})[0-9a-fA-F]{16}',
+    process_func=lambda v: 'away' if int(v, 16) != 0 else 'none')
     
     # 난방온도 설정 커맨드
     난방.register_command(message_flag='43', attr_name='power', topic_class='mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v == 'heat' else '00')
     난방.register_command(message_flag='44', attr_name='targettemp', topic_class='temperature_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: format(int(float(v) // 1 + float(v) % 1 * 128 * 2), '02x'))
-    난방.register_command(message_flag='45', attr_name='preset_mode', topic_class='preset_mode_command_topic', controll_id=['11','12','13','14'], process_func=lambda v: '01' if v == 'away' else '00')
+    난방.register_command(
+    message_flag='45',                        # 외출 모드 명령 플래그
+    attr_name='preset_mode',                  # 🌟 preset_mode 로 통일
+    topic_class='preset_mode_command_topic',  # 맞는 토픽 클래스
+    controll_id=['11','12','13','14'],        # 각 방 컨트롤 ID
+    process_func=lambda v:                    # UI에서 받은 값(v)이 'away'일 땐 0x01, 아니면 0x00
+        '01' if v == 'away' else '00')
 
 wallpad.listen()
