@@ -302,7 +302,7 @@ optional_info = {'optimistic': 'false'}
 가스.register_command(message_flag='41', attr_name='power', topic_class='command_topic', process_func=lambda v: '00' if v == 'ON' else '04')
 
 # 조명
-optional_info = {'optimistic': 'false', 'qos': 2, 'min_mireds': 153, 'max_mireds': 500}
+optional_info = {'optimistic': 'false', 'qos': 2}
 
 거실 = wallpad.add_device(device_name='거실', device_id='0e', device_subid='1f', child_devices = ["거실", "복도"], device_class='light', optional_info=optional_info)
 안방 = wallpad.add_device(device_name='안방', device_id='0e', device_subid='2f', child_devices = ["안방"], device_class='light', optional_info=optional_info)
@@ -312,71 +312,6 @@ optional_info = {'optimistic': 'false', 'qos': 2, 'min_mireds': 153, 'max_mireds
 
 거실.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'00([012345][23])(0[01])', process_func=lambda v: 'ON' if v in ['13', '23', '33', '43', '53'] else 'OFF' if v == '02' else 'ON' if v == '01' else 'OFF')
 거실.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['11','12'], process_func=lambda v: '01' if v == 'ON' else '00')
-
-# ───────────────────────────────  
-# 2) 밝기(brightness) 처리  
-# ───────────────────────────────  
-# 단계별 코드 ↔ HA 값 매핑 테이블
-_B2C = {'1':'13','2':'23','3':'33','4':'43','5':'53'}     # step→KSX
-_C2B = {v:k for k,v in _B2C.items()}                     # KSX→step
-def code_to_brightness(code):
-    step = int(_C2B.get(code.upper(),'0'))
-    return 0 if step==0 else step*51                       # 1→51, 5→255
-
-def brightness_to_code(payload):
-    val = int(payload)
-    if val == 0: return '00'
-    step = min(5, max(1, round(val/51)))
-    return _B2C[str(step)]
-
-# 상태 등록 (status_flag='81' 패킷에서 13/23/... 추출)
-거실.register_status(
-    message_flag='81',
-    attr_name='brightness',
-    topic_class='brightness_state_topic',
-    regex=r'00([012345][23])',
-    process_func=lambda v: code_to_brightness(v)
-)
-# 명령 등록 (command_flag='42' → KSX 프로토콜상 밝기 커맨드)
-거실.register_command(
-    message_flag='42',
-    attr_name='brightness',
-    topic_class='brightness_command_topic',
-    controll_id=['11','12'],
-    process_func=lambda v: brightness_to_code(v)
-)
-
-# ───────────────────────────────  
-# 3) 색온도(color_temp) 처리  
-# ───────────────────────────────  
-# 단계별 KSX 코드 ↔ 색온도(HA 값) 테이블
-_CTC = {'11':500,'21':413,'31':326,'41':239,'51':153}   # KSX→Kelvin
-_CTK = {v:k for k,v in _CTC.items()}                   # Kelvin→KSX
-
-def code_to_color_temp(code):
-    return _CTC.get(code.lower(), None)
-
-def color_temp_to_code(payload):
-    val = int(payload)
-    # 153~500 구간을 5단계로 나눠 가장 가까운 단계 코드 선택
-    best = min(_CTC.items(), key=lambda kv: abs(kv[1]-val))
-    return best[0]
-# 상태 등록
-거실.register_status(
-    message_flag='81',
-    attr_name='color_temp',
-    topic_class='color_temp_state_topic',
-    regex=r'00[0-9A-Fa-f]{2}([012345]1)',
-    process_func=lambda v: code_to_color_temp(v)
-)
-# 명령 등록
-거실.register_command(
-    message_flag='43',
-    attr_name='color_temp',
-    topic_class='color_temp_command_topic',
-    controll_id=['11','12'],
-    process_func=lambda v: color_temp_to_code(v)
-)
 
 안방.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'0[01](0[01])', process_func=lambda v: 'ON' if v == '01' else 'OFF')
 안방.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['21'], process_func=lambda v: '01' if v == 'ON' else '00')
