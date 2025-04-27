@@ -334,7 +334,7 @@ def brightness_to_code(payload):
     message_flag='81',
     attr_name='brightness',
     topic_class='brightness_state_topic',
-    regex=r'00[0-9A-Fa-f]{12}([0-9A-Fa-f]{2})',
+    regex==r'00([012345][23])',
     process_func=lambda v: code_to_brightness(v)
 )
 # 명령 등록 (command_flag='42' → KSX 프로토콜상 밝기 커맨드)
@@ -361,6 +361,22 @@ def color_temp_to_code(payload):
     # 153~500 구간을 5단계로 나눠 가장 가까운 단계 코드 선택
     best = min(_CTC.items(), key=lambda kv: abs(kv[1]-val))
     return best[0]
+# 상태 등록
+거실.register_status(
+    message_flag='81',
+    attr_name='color_temp',
+    topic_class='color_temp_state_topic',
+    regex=r'00[0-9A-Fa-f]{2}([012345]1)',
+    process_func=lambda v: code_to_color_temp(v)
+)
+# 명령 등록
+거실.register_command(
+    message_flag='43',
+    attr_name='color_temp',
+    topic_class='color_temp_command_topic',
+    controll_id=['11','12'],
+    process_func=lambda v: color_temp_to_code(v)
+)
 
 안방.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'0[01](0[01])', process_func=lambda v: 'ON' if v == '01' else 'OFF')
 안방.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['21'], process_func=lambda v: '01' if v == 'ON' else '00')
