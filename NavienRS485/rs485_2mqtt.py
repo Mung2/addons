@@ -334,7 +334,7 @@ def brightness_to_code(payload):
     message_flag='81',
     attr_name='brightness',
     topic_class='brightness_state_topic',
-    regex==r'00([012345][23])',
+    regex=r'00([012345][23])',
     process_func=lambda v: code_to_brightness(v)
 )
 # 명령 등록 (command_flag='42' → KSX 프로토콜상 밝기 커맨드)
