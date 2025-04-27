@@ -352,7 +352,7 @@ optional_info = {'optimistic': 'false', 'qos': 2, 'min_mireds': 153, 'max_mireds
 주방 = wallpad.add_device(device_name='주방', device_id='0e', device_subid='5f', child_devices = ["주방", "식탁"], device_class='light', optional_info=optional_info)
 
 거실.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'00([012345][23])(0[01])', process_func=lambda v: 'ON' if v in ['13', '23', '33', '43', '53'] else 'OFF' if v == '02' else 'ON' if v == '01' else 'OFF')
-
+거실.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['11','12'], process_func=lambda v: '01' if v == 'ON' else '00')
 # 밝기 상태
 거실.register_status(
     message_flag = '81',                                            
@@ -385,8 +385,7 @@ optional_info = {'optimistic': 'false', 'qos': 2, 'min_mireds': 153, 'max_mireds
     topic_class  = 'color_temp_command_topic',
     controll_id  = ['11','12'],
     process_func = cmd_color_temp
-
-거실.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['11','12'], process_func=lambda v: '01' if v == 'ON' else '00')
+)
 
 안방.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'0[01](0[01])', process_func=lambda v: 'ON' if v == '01' else 'OFF')
 안방.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['21'], process_func=lambda v: '01' if v == 'ON' else '00')
