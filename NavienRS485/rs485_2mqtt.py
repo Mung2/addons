@@ -302,47 +302,6 @@ optional_info = {'optimistic': 'false'}
 가스.register_command(message_flag='41', attr_name='power', topic_class='command_topic', process_func=lambda v: '00' if v == 'ON' else '04')
 
 # 조명
-levels = 5
-MIN_BRIGHT = 0
-MAX_BRIGHT = 255
-MIN_CT = 153
-MAX_CT = 500
-
-brightness_step_map = {0x03:1, 0x13:2, 0x23:3, 0x33:4, 0x43:5}
-color_step_map      = {0x11:1, 0x21:2, 0x31:3, 0x41:4, 0x51:5}
-
-def parse_brightness(v: str) -> int:
-    # """16진수 스트링 v → HA 밝기값(0–255)"""
-    raw = int(v, 16)
-    step = brightness_step_map.get(raw, 1)
-    pct = (step - 1) / (levels - 1)
-    return round(pct * (MAX_BRIGHT - MIN_BRIGHT) + MIN_BRIGHT)
-
-def parse_color_temp(v: str) -> int:
-    # """16진수 스트링 v → HA 색온도값(153–500)"""
-    raw = int(v, 16)
-    step = color_step_map.get(raw, 1)
-    pct = (step - 1) / (levels - 1)
-    return round(pct * (MAX_CT - MIN_CT) + MIN_CT)
-
-def cmd_brightness(v: str) -> str:
-    # """HA → raw hex”01”,”02”… 아님. 밝기(0–255) → 적절한 KSX 명령코드(16진수)"""
-    # v 는 '0'~'255' 로 들어온다고 가정
-    b = int(v)
-    pct = b / (MAX_BRIGHT or 1)
-    step = min(levels, max(1, round(pct * (levels - 1)) + 1))
-    # step → raw hex
-    rev = {v:k for k,v in brightness_step_map.items()}
-    return format(rev.get(step, 0x03), '02x')
-
-def cmd_color_temp(v: str) -> str:
-    # """HA → raw hex”11”,”21”… 색온도(153–500) → KSX 명령"""
-    ct = int(v)
-    pct = (ct - MIN_CT) / max(1, (MAX_CT - MIN_CT))
-    step = min(levels, max(1, round(pct * (levels - 1)) + 1))
-    rev = {v:k for k,v in color_step_map.items()}
-    return format(rev.get(step, 0x11), '02x')
-
 optional_info = {'optimistic': 'false', 'qos': 2, 'min_mireds': 153, 'max_mireds': 500}
 
 거실 = wallpad.add_device(device_name='거실', device_id='0e', device_subid='1f', child_devices = ["거실", "복도"], device_class='light', optional_info=optional_info)
