@@ -302,14 +302,90 @@ optional_info = {'optimistic': 'false'}
 가스.register_command(message_flag='41', attr_name='power', topic_class='command_topic', process_func=lambda v: '00' if v == 'ON' else '04')
 
 # 조명
-optional_info = {'optimistic': 'false'}
-거실 = wallpad.add_device(device_name='거실', device_id='0e', device_subid='1f', child_devices = ["거실", "복도"], device_class='light', optional_info=optional_info)
+levels = 5
+MIN_BRIGHT = 0
+MAX_BRIGHT = 255
+MIN_CT = 153
+MAX_CT = 500
+
+brightness_step_map = {0x03:1, 0x13:2, 0x23:3, 0x33:4, 0x43:5}
+color_step_map      = {0x11:1, 0x21:2, 0x31:3, 0x41:4, 0x51:5}
+
+def parse_brightness(v: str) -> int:
+    # """16진수 스트링 v → HA 밝기값(0–255)"""
+    raw = int(v, 16)
+    step = brightness_step_map.get(raw, 1)
+    pct = (step - 1) / (levels - 1)
+    return round(pct * (MAX_BRIGHT - MIN_BRIGHT) + MIN_BRIGHT)
+
+def parse_color_temp(v: str) -> int:
+    # """16진수 스트링 v → HA 색온도값(153–500)"""
+    raw = int(v, 16)
+    step = color_step_map.get(raw, 1)
+    pct = (step - 1) / (levels - 1)
+    return round(pct * (MAX_CT - MIN_CT) + MIN_CT)
+
+def cmd_brightness(v: str) -> str:
+    # """HA → raw hex”01”,”02”… 아님. 밝기(0–255) → 적절한 KSX 명령코드(16진수)"""
+    # v 는 '0'~'255' 로 들어온다고 가정
+    b = int(v)
+    pct = b / (MAX_BRIGHT or 1)
+    step = min(levels, max(1, round(pct * (levels - 1)) + 1))
+    # step → raw hex
+    rev = {v:k for k,v in brightness_step_map.items()}
+    return format(rev.get(step, 0x03), '02x')
+
+def cmd_color_temp(v: str) -> str:
+    # """HA → raw hex”11”,”21”… 색온도(153–500) → KSX 명령"""
+    ct = int(v)
+    pct = (ct - MIN_CT) / max(1, (MAX_CT - MIN_CT))
+    step = min(levels, max(1, round(pct * (levels - 1)) + 1))
+    rev = {v:k for k,v in color_step_map.items()}
+    return format(rev.get(step, 0x11), '02x')
+
+optional_info = {'optimistic': 'false', 'qos': 2, 'min_mireds': 153, 'max_mireds': 500}
+
+거실 = wallpad.add_device(device_name='거실', device_id='0e', device_subid='1f', child_devices = ["거실", "복도"], device_class='light', optional_info={**optional_info, 'brightness': True, 'brightness_scale': 255, 'color_temp': True, 'min_mireds': MIN_CT, 'max_mireds': MAX_CT,})
 안방 = wallpad.add_device(device_name='안방', device_id='0e', device_subid='2f', child_devices = ["안방"], device_class='light', optional_info=optional_info)
 끝방 = wallpad.add_device(device_name='끝방', device_id='0e', device_subid='3f', child_devices = ["끝방"], device_class='light', optional_info=optional_info)
 중간방 = wallpad.add_device(device_name='중간방', device_id='0e', device_subid='4f', child_devices = ["중간방", "펜트리"], device_class='light', optional_info=optional_info)
 주방 = wallpad.add_device(device_name='주방', device_id='0e', device_subid='5f', child_devices = ["주방", "식탁"], device_class='light', optional_info=optional_info)
 
 거실.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'00([012345][23])(0[01])', process_func=lambda v: 'ON' if v in ['13', '23', '33', '43', '53'] else 'OFF' if v == '02' else 'ON' if v == '01' else 'OFF')
+
+# 밝기 상태
+거실.register_status(
+    message_flag = '81',                                            
+    attr_name    = 'brightness',
+    topic_class  = 'brightness_state_topic',
+    regex        = r'00[0-9A-Fa-f]{24}([0-9A-Fa-f]{2})',
+    process_func = parse_brightness
+)
+# 밝기 조절 커맨드
+거실.register_command(
+    message_flag = '41',                                           
+    attr_name    = 'brightness',
+    topic_class  = 'brightness_command_topic',
+    controll_id  = ['11','12'],
+    process_func = cmd_brightness
+)
+
+# 색온도 상태
+거실.register_status(
+    message_flag = '81',
+    attr_name    = 'color_temp',
+    topic_class  = 'color_temp_state_topic',
+    regex        = r'00[0-9A-Fa-f]{28}([0-9A-Fa-f]{2})',
+    process_func = lambda v: int(v, 16)
+)
+# 색온도 조절 커맨드
+거실.register_command(
+    message_flag = '41',
+    attr_name    = 'color_temp',
+    topic_class  = 'color_temp_command_topic',
+    controll_id  = ['11','12'],
+    process_func = cmd_color_temp
+
 거실.register_command(message_flag='41', attr_name='power', topic_class='command_topic', controll_id=['11','12'], process_func=lambda v: '01' if v == 'ON' else '00')
 
 안방.register_status(message_flag='81', attr_name='power', topic_class='state_topic', regex=r'0[01](0[01])', process_func=lambda v: 'ON' if v == '01' else 'OFF')
